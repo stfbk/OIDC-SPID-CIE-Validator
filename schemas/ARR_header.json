@@ -1,0 +1,23 @@
+{
+    "type": "object",
+    "properties": {
+        "alg": {
+            "type": "string",
+            "not": {
+                "enum": [
+                    "none",
+                    "HS512",
+                    "HS256",
+                    "HS384"
+                ]
+            }
+        },
+        "kid": {
+            "type": "string"
+        }
+    },
+    "required": [
+        "alg",
+        "kid"
+    ]
+}

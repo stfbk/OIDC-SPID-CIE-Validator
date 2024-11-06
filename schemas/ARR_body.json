@@ -1,0 +1,527 @@
+{
+  "type": "object",
+  "properties": {
+    "client_id": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://[^?#]+$"
+    },
+    "code_challenge": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._~-]+$",
+      "minLength": 43,
+      "maxLength": 128
+    },
+    "code_challenge_method": {
+      "type": "string",
+      "enum": [
+        "S256",
+        "plain"
+      ]
+    },
+    "nonce": {
+      "type": "string",
+      "pattern": "^[\u0020-\u007E]{32,}$"
+    },
+    "prompt": {
+      "type": "string",
+      "enum": [
+        "consent",
+        "consent login"
+      ]
+    },
+    "redirect_uri": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://"
+    },
+    "response_type": {
+      "type": "string",
+      "const": "code"
+    },
+    "scope": {
+      "type": "string"
+    },
+    "acr_values": {
+      "type": "string",
+      "pattern": "^(https://www\\.spid\\.gov\\.it/SpidL1|https://www\\.spid\\.gov\\.it/SpidL2|https://www\\.spid\\.gov\\.it/SpidL3)(\\s(https://www\\.spid\\.gov\\.it/SpidL1|https://www\\.spid\\.gov\\.it/SpidL2|https://www\\.spid\\.gov\\.it/SpidL3))*$"
+    },
+    "claims": {
+      "type": "object",
+      "properties": {
+        "userinfo": {
+          "$ref": "#/definitions/commonProperties"
+        },
+        "id_token": {
+          "$ref": "#/definitions/commonProperties"
+        }
+      },
+      "additionalProperties": false
+    },
+    "state": {
+      "type": "string",
+      "pattern": "^[\u0020-\u007E]{32,}$"
+    },
+    "exp": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "iat": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "iss": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://"
+    },
+    "aud": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https://"
+          }
+        },
+        {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://"
+        }
+      ]
+    },
+    "ui_locales": {
+      "type": "string",
+      "pattern": "^([a-zA-Z]{2,3}(-[a-zA-Z]{4})?(-[a-zA-Z]{2})?)( ([a-zA-Z]{2,3}(-[a-zA-Z]{4})?(-[a-zA-Z]{2})?))*$"
+    }
+  },
+  "required": [
+    "client_id",
+    "code_challenge",
+    "code_challenge_method",
+    "nonce",
+    "prompt",
+    "redirect_uri",
+    "response_type",
+    "scope",
+    "acr_values",
+    "claims",
+    "state",
+    "exp",
+    "iat",
+    "iss",
+    "aud",
+    "ui_locales"
+  ],
+  "if": {
+    "properties": {
+      "scope": {
+        "pattern": "\\bprofile\\b"
+      }
+    }
+  },
+  "then": {
+    "properties": {
+      "claims": {
+        "properties": {
+          "userinfo": {
+            "required": [
+              "given_name",
+              "family_name",
+              "birthdate",
+              "https://attributes.eid.gov.it/fiscal_number"
+            ]
+          },
+          "id_token": {
+            "required": [
+              "given_name",
+              "family_name",
+              "birthdate",
+              "https://attributes.eid.gov.it/fiscal_number"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "else": {
+    "if": {
+      "properties": {
+        "scope": {
+          "pattern": "\\bemail\\b"
+        }
+      }
+    },
+    "then": {
+      "properties": {
+        "claims": {
+          "properties": {
+            "userinfo": {
+              "required": [
+                "email",
+                "email_verified"
+              ]
+            },
+            "id_token": {
+              "required": [
+                "email",
+                "email_verified"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "else": {
+      "if": {
+        "properties": {
+          "scope": {
+            "pattern": "\\bprofile\\b.*\\bemail\\b|\\bemail\\b.*\\bprofile\\b"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "claims": {
+            "properties": {
+              "userinfo": {
+                "required": [
+                  "given_name",
+                  "family_name",
+                  "birthdate",
+                  "https://attributes.eid.gov.it/fiscal_number",
+                  "email",
+                  "email_verified"
+                ]
+              },
+              "id_token": {
+                "required": [
+                  "given_name",
+                  "family_name",
+                  "birthdate",
+                  "https://attributes.eid.gov.it/fiscal_number",
+                  "email",
+                  "email_verified"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "claims": {
+            "properties": {
+              "userinfo": {
+                "required": []
+              },
+              "id_token": {
+                "required": []
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "commonProperties": {
+      "type": "object",
+      "properties": {
+        "given_name": {
+          "$ref": "#/definitions/claims_type"
+        },
+        "family_name": {
+          "$ref": "#/definitions/claims_type"
+        },
+        "place_of_birth": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "essential": {
+                  "type": "boolean"
+                },
+                "locality": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "region": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "birthdate": {
+          "$ref": "#/definitions/claims_type"
+        },
+        "gender": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "essential": {
+                  "type": "boolean"
+                }
+              }
+            },
+            {
+              "type": "string",
+              "enum": [
+                "female",
+                "male",
+                null
+              ]
+            }
+          ]
+        },
+        "https://attributes.eid.gov.it/fiscal_number": {
+          "$ref": "#/definitions/claims_type"
+        },
+        "email": {
+          "$ref": "#/definitions/claims_type"
+        },
+        "email_verified": {
+          "$ref": "#/definitions/claims_type"
+        },
+        "document_details": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "essential": {
+                  "type": "boolean"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "cartaIdentita",
+                    "passaporto",
+                    "patenteGuida",
+                    "patenteNautica",
+                    "librettoPensione",
+                    "patentinoImpTermici",
+                    "portoArmi",
+                    "tesseraRiconoscimento",
+                    null
+                  ]
+                },
+                "document_number": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "issuer": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "name"
+                  ]
+                },
+                "date_of_issuance": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                "date_of_expiry": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                }
+              },
+              "required": [
+                "type",
+                "document_number",
+                "issuer",
+                "date_of_issuance",
+                "date_of_expiry"
+              ]
+            }
+          ]
+        },
+        "phone_number": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "essential": {
+                  "type": "boolean"
+                }
+              }
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            }
+          ]
+        },
+        "phone_number_verified": {
+          "$ref": "#/definitions/claims_type"
+        },
+        "address": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "essential": {
+                  "type": "boolean"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "properties": {
+                "street_address": {
+                  "type": "string"
+                },
+                "postal_code": {
+                  "type": "string"
+                },
+                "locality": {
+                  "type": "string"
+                },
+                "region": {
+                  "type": "string"
+                },
+                "country_code": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{2}$"
+                }
+              },
+              "required": [
+                "street_address",
+                "postal_code",
+                "locality",
+                "region",
+                "country_code"
+              ]
+            }
+          ]
+        }
+      },
+      "patternProperties": {
+        "^https?:\\/\\/.+\\/fiscal_number$": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "essential": {
+                  "type": "boolean"
+                }
+              }
+            },
+            {
+              "type": "string",
+              "pattern": "^TINT-[A-Za-z0-9]+$"
+            }
+          ]
+        },
+        "^https?:\\/\\/.+\\/landline_number$": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "essential": {
+                  "type": "boolean"
+                }
+              }
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            }
+          ]
+        },
+        "^https?:\\/\\/.+\\/e_delivery_service$": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "essential": {
+                  "type": "boolean"
+                }
+              }
+            },
+            {
+              "type": "string",
+              "format": "email"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "claims_type": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "essential": {
+              "type": "boolean"
+            }
+          }
+        }
+      ]
+    }
+  }
+}
