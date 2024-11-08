@@ -541,6 +541,7 @@ def init(url_rp, url_ar, schemas):
 
             #Check headers of HTTP
             content = response.headers.get('Content-Type')
+            content = content.split(";", 1)[0]
             if bool(content):
                 test_manager.append_test(param_manager.increment_value("EC", param_manager.section), "Content-Type", content == "application/entity-statement+jwt", f"Content-Type MUST be a string valued as 'application/entity-statement+jwt'. The value in the message is {content}")
             else:

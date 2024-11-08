@@ -211,7 +211,7 @@
             "federation_resolve_endpoint": {
               "type": "string",
               "format": "uri",
-              "pattern": "^https://.*?/resolve/?$"
+              "pattern": "^https://.*?/resolve/?"
             },
             "organization_name": {
               "type": "string"
