@@ -8,8 +8,8 @@ The required inputs are the Entity Configuration endpoint URL (URL_EC) and the U
 
 OIDC-SPID/CIE-Validator outputs results in two modes:
 
-* In verbose mode, it provides detailed feedback on both passed and failed tests, including explanations or suggested mitigations for failures.
-* In non-verbose mode, it only reports failed tests, along with the reasons and potential solutions.
+- In verbose mode, it provides detailed feedback on both passed and failed tests, including explanations or suggested mitigations for failures.
+- In non-verbose mode, it only reports failed tests, along with the reasons and potential solutions.
 
 ## Summary
 
@@ -36,14 +36,14 @@ OIDC-SPID/CIE-Validator outputs results in two modes:
 OIDC-SPID/CIE-Validator
 ├── run.sh
 ├── schemas
-│   ├── ARR_body.json
-│   ├── ARR_body_SPID.json
-│   ├── ARR_header.json
-│   ├── EC_body.json
-│   ├── EC_body_SPID.json
-│   ├── EC_header.json
-│   ├── TM_body.json
-│   └── TM_header.json
+│   ├── ARR_body.json
+│   ├── ARR_body_SPID.json
+│   ├── ARR_header.json
+│   ├── EC_body.json
+│   ├── EC_body_SPID.json
+│   ├── EC_header.json
+│   ├── TM_body.json
+│   └── TM_header.json
 └── tool
     ├── mig_validator.py
     └── style_table.py
@@ -75,6 +75,7 @@ The tool folder provides:
 OIDC-SPID/CIE-Validator is based on python and can be executed via the following methods:
 
 ### Linux, MacOS or WSL
+
 <details>
 <summary>Details</summary>
 
@@ -128,9 +129,9 @@ These inputs can be provided via command-line arguments (using `--ec <URL_EC>` o
 
 There are also optional arguments:
 
-* `--v`, to receive a **verbose** output
-* `--f <filename>` or `--filename <filename>`, if you want to add a file as a input, e.g., to run the tool on multiple RPs
-* `--spid`, to execute SPID compliance instead of the CIE on default
+- `--v`, to receive a **verbose** output
+- `--f <filename>` or `--filename <filename>`, if you want to add a file as a input, e.g., to run the tool on multiple RPs
+- `--spid`, to execute SPID compliance instead of the CIE on default
 
 Example command: `sh run.sh --ec "https://testing_rp.fbk/" --ar "https://testing_rp.fbk/request"`
 

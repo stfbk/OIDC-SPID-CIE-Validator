@@ -84,7 +84,7 @@ class TestManager:
             parent = next((t for t in self.simple_output if t["ID"] == parent_id), None)
             
             # Only process if this is a subsection (has more than 1 part)
-            if parent and len(parent["ID"].split('.')) > 1:
+            if parent:
                 #If any subsection failed and parent has not already FAILED, mark parent as FAILED and ADD
                 if test["Test Result"] in ["FAILED", "[FAILED]"] and not (parent["Test Result"] in ["FAILED", "[FAILED]"] and parent["Reason/Mitigation"]):
                     self.update_test(parent_id, "Test Result", "[FAILED]")
@@ -541,9 +541,10 @@ def init(url_rp, url_ar, schemas):
 
             #Check headers of HTTP
             content = response.headers.get('Content-Type')
-            test_manager.append_test(param_manager.increment_value("EC", param_manager.section), "Content-Type", bool(content), "Content-Type MUST be present")
             if bool(content):
-                test_manager.append_test(param_manager.increment_value("EC", param_manager.section), "Content-Type", content == "application/entity-statement+jwt", f"Content-Type MUST be present as a string valued as 'application/entity-statement+jwt'. The value in the message is {content}")
+                test_manager.append_test(param_manager.increment_value("EC", param_manager.section), "Content-Type", content == "application/entity-statement+jwt", f"Content-Type MUST be a string valued as 'application/entity-statement+jwt'. The value in the message is {content}")
+            else:
+                test_manager.append_test(param_manager.increment_value("EC", param_manager.section), "Content-Type", bool(content), "Content-Type MUST be present")
 
             test_manager.append_test(param_manager.increment_value("EC", param_manager.section), "Return the Entity Configuration Metadata", bool(response), f"The URL at .well.known/openid-federation MUST contain a JWT")
 
