@@ -84,7 +84,7 @@ OIDC-SPID/CIE-Validator is based on python and can be executed via the following
 <details>
 <summary>Details</summary>
 
-Run the bash script: `sh run.sh`
+Run the bash script: `sh validator.sh`
 
 This will create a virtual environment, activates it and installs dependencies, and starts the tool.
 
@@ -130,7 +130,7 @@ These inputs can be provided via command-line arguments (using `--ec <URL_EC>` o
 There are also optional arguments:
 
 - `--v`, to receive a **verbose** output
-- `--f <filename>` or `--filename <filename>`, if you want to add a file as a input, e.g., to run the tool on multiple RPs
+- `--f <filename>` or `--filename <filename>`, if you want to add a file as a input, e.g., to run the tool on multiple RPs. It contains the list of URLs, where URL_EC is in the first line and URL_AR in the second.
 - `--spid`, to execute SPID compliance instead of the CIE on default
 
 Example command: `sh run.sh --ec "https://testing_rp.fbk/" --ar "https://testing_rp.fbk/request"`

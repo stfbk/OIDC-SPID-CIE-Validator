@@ -171,7 +171,7 @@ class ParamManager:
     def reset(self):
         self.__init__()
 
-#Class that provides methods for validating various data formats
+#Class that provides methods for validating various data formats, .g., schema, signature
 class Validator(ABC):
     def __init__(self):
         pass
