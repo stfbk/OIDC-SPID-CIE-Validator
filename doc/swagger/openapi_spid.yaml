@@ -565,7 +565,7 @@ components:
                 enum:  ["code"]
               jwks:
                 type:  object
-                pattern: \[\s*({[^}]*"kty"\s*:\s*"[^"]*"\s*,\s*"kid"\s*:\s*"[^"]*"[^}]*})(\s*,\s*{[^}]*"kty"\s*:\s*"[^"]*"\s*,\s*"kid"\s*:\s*"[^"]*"[^}]*})*\s*\]
+                pattern: '\[\s*({[^}]*"kty"\s*:\s*"[^"]*"\s*,\s*"kid"\s*:\s*"[^"]*"[^}]*})(\s*,\s*{[^}]*"kty"\s*:\s*"[^"]*"\s*,\s*"kid"\s*:\s*"[^"]*"[^}]*})*\s*\]'
                 x-conditional-required:  if not signed_jwks_uri
               signed_jwks_uri:
                 type: string
