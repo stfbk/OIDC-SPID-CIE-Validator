@@ -1,6 +1,6 @@
 # OIDC-SPID/CIE-Validator
 
-OIDC-SPID/CIE-Validator offers a streamlined version of [MIG](https://github.com/stfbk/mig/) [1] for Relying Parties (RPs) to perform preliminary verification of compliance with the [SPID/CIE OIDC Specification](https://docs.italia.it/italia/spid/spid-cie-oidc-docs). This includes a total of 251 tests for both the Entity Configuration (EC) response and the Authorization (AR) request. These tests verify the presence, type, expected values, unacceptable values, and the validity of the signature across all mandatory, conditional, and optional parameters, as specified in the SPID/CIE OIDC Specification.
+OIDC-SPID/CIE-Validator offers a streamlined version of [MIG](https://github.com/stfbk/mig/) [1] for Relying Parties (RPs) to perform preliminary verification of compliance with the [SPID/CIE OIDC Specification](https://docs.italia.it/italia/spid/spid-cie-oidc-docs). This includes a total of 252 tests for both the Entity Configuration (EC) response and the Authorization (AR) request. These tests verify the presence, type, expected values, unacceptable values, and the validity of the signature across all mandatory, conditional, and optional parameters, as specified in the SPID/CIE OIDC Specification.
 
 OIDC-SPID/CIE-Validator uses JSON Schemas to validate the JWT in both the EC response and request in the AR. Additionally, OIDC-SPID/CIE-Validator verifies the correctness of parameters in the EC response and AR request through script-based validation.
 
@@ -130,7 +130,7 @@ These inputs can be provided via command-line arguments (using `--ec <URL_EC>` o
 There are also optional arguments:
 
 - `--v`, to receive a **verbose** output
-- `--f <filename>` or `--filename <filename>`, if you want to add a file as a input, e.g., to run the tool on multiple RPs. It contains the list of URLs, where URL_EC is in the first line and URL_AR in the second.
+- `--f <filename>` or `--filename <filename>`,  if you want to add a file as input, e.g., to run the tool on multiple RPs. It contains the list of URLs, where URL_EC is in the first line and URL_AR in the second. You can find the sample file as `sample_inputfile.txt`. To improve readability, blank lines between URLs are allowed. These blank lines will be ignored during processing.
 - `--spid`, to execute SPID compliance instead of the CIE on default
 
 Example command: `sh run.sh --ec "https://testing_rp.fbk/" --ar "https://testing_rp.fbk/request"`

@@ -1,0 +1,572 @@
+openapi: 3.0.3
+info:
+  title: OAuth2 Authorization API
+  version: 1.0.0
+
+paths:
+  /authentication:
+    get:
+      summary: Authentication Endpoint
+      description: |
+        Initiates the OAuth2 Authentication flow. 
+      parameters:
+        - name: Content-Type
+          in: header
+          required: true
+          description: Type of Content type.
+          schema:
+            type: string
+            enum: [application/x-www-form-urlencoded]
+        - name: response_type
+          in: query
+          required: false
+          description: Type of authorization response (e.g., "code" for Authorization Code flow).
+          schema:
+            type: string
+            enum: [code]
+            x-comparison-parameter: this == \authorize-get-client_id
+        - name: client_id
+          in: query
+          required: false
+          description: Client identifier issued to the application making the request.
+          schema:
+            type: string
+            format: uri
+            pattern: '^https://'
+            x-comparison-parameter: client_id == $.client_id
+            enum: [Uniquely identifies RP] 
+        - name: scope
+          in: query
+          required: true
+          description: Space-separated list of scopes.
+          schema:
+            type: string
+            x-comparison-parameter: "scope in $.metadataOP.scopes_supported"
+            x-comparison-value: OPENID IN
+        - name: code_challenge
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: code_challenge_method
+          in: query
+          required: true
+          schema:
+            x-comparison-parameter: code_challenge_method in $.metadataOP.code_challenge_methods_supported
+        - name: request
+          in: query
+          required: true
+          description: The jwt MUST follow the JWTRequest schema
+          x-signature: true
+          schema:
+            type: string
+            pattern: '[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+\/=]*'
+
+      responses:
+        '302':
+          description: Redirects to the `redirect_uri` with authorization parameters.
+          headers:
+            Location:
+              description: The URL to which the user is redirected, including query parameters such as `code` or `error`.
+              required: true
+              schema:
+                type: string
+                format: uri
+            Content-Type:
+              description: Must be app
+              schema:
+                type: string
+          content:
+            application/x-www-form-urlencoded:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                    description: The authorization code to be exchanged for an access token (only present if `response_type=code`).
+                  state:
+                    type: string
+                    description: The `state` parameter if provided in the request.
+                  error:
+                    type: string
+                    description: Error code if authorization fails (e.g., `access_denied`, `invalid_request`).
+                  error_description:
+                    type: string
+                    description: Description of the error if authorization fails.
+    post:
+      summary: Authorization request using POST
+      description: |
+        Sends an authorization request with JWT as a form parameter.
+        The JWT contains parameters like `iss`, `sub`, and `aud`.
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required:
+                  - response_type
+                  - request
+              properties:
+                response_type:
+                  type: string
+                  description: Type of authorization response (e.g., "code" for Authorization Code flow).
+                  enum: [code, token]
+                client_id:
+                  description: Client identifier issued to the application making the request.
+                  type: string
+                redirect_uri:
+                  description: The URI to redirect the user to after authorization.
+                  type: string
+                scope:
+                  description: Space-separated list of scopes.
+                  type: string
+                state:
+                  description: An opaque value to maintain state between the request and callback.
+                  type: string
+                request:
+                  description: The jwt MUST follow the JWTRequest schema
+                  type: string
+                  pattern: '[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+\/=]*'
+                  x-signature: true
+      responses:
+        '200':
+          description: Successful authorization response
+          content:
+            application/json:
+              schema:
+                type: string
+        '400':
+          description: Invalid request
+  /.well-known/openid-federation:
+    get:
+      summary: Retrieve OpenID Connect Federation Metadata
+      description: |
+        This endpoint provides metadata for the OpenID Connect Federation, containing information such as supported algorithms, federation entity ID, and other configuration details.
+      parameters: []
+      responses:
+        '200':
+          description: Successful response with OpenID Federation metadata
+          content:
+            application/entity-statement+jwt:
+              schema:
+                type: object
+                required:
+                  - jwt
+                properties:
+                  jwt:
+                    type: object
+                    description: JWT containing federation metadata
+                    required:
+                      - header
+                      - payload
+                    properties:
+                      header:
+                        type: object
+                        description: Header section of the JWT
+                        required:
+                          - alg
+                          - typ
+                          - kid
+                        properties:
+                          alg:
+                            type: string
+                            description: Algorithm used to sign the JWT (e.g., RS256, ES256).
+                            example: RS256
+                            enum: ["RS256", "RS512", "ES256", "ES512", "PS256", "PS512"]                              
+                          typ:
+                            type: string
+                            description: Type of the token, usually "JWT".
+                            example: JWT
+                            enum: [entity-statement+jwt]
+                          kid:
+                            type: string
+                            description: Key ID hint used to select the public key to verify the JWT.
+                            example: "1b94c"
+                            enum: [The Key ID of the signing key used] 
+                      payload:
+                        type: object
+                        description: Payload section of the JWT containing federation claims
+                        required:
+                          - iss
+                          - sub
+                          - iat
+                          - exp
+                          - jwks
+                          - metadata
+                          - authority_hints
+                        properties:
+                          iss:
+                            type: string
+                            format: uri
+                            pattern: '^https://[^?#]+$'
+                            description: Issuer identifier for the federation.
+                            enum: [Identifier of the issuing Entity] 
+                            x-comparison-parameter: iss==sub
+                          sub:
+                            type: string
+                            description: Subject identifier for the federation entity.
+                            pattern: '^https://[^?#]+$'
+                            enum: [Identifier of the Entity to which it is referred] 
+                          jwks: 
+                            type: object
+                            pattern: '"keys"\s*:\s*\[\s*(\{[^}]*"kty"\s*:\s*"[^"]*"\s*,\s*"kid"\s*:\s*"[^"]*"[^\}]*\}\s*,\s*)*(\{[^}]*"kty"\s*:\s*"[^"]*"\s*,\s*"kid"\s*:\s*"[^"]*"[^\}]*\})\s*\]'
+                          exp:
+                            type: integer
+                            format: int64
+                            description: Expiration time of the JWT as a Unix timestamp.
+                          iat:
+                            type: integer
+                            format: int64
+                            x-comparison-parameter: iat < exp
+                          metadata:
+                            type: object
+                            enum: ["openid_relying_party", "openid_provider", "federation_entity", "oauth_authorization_server", "oauth_resource"]
+                          authority_hints:
+                            type: array 
+                            items:
+                              type: string
+                            pattern: \[\s*"https:\/\/[^\s/$.?#].[^\s]*"\s*(,\s*"https:\/\/[^\s/$.?#].[^\s]*"\s*)*\]
+                            enum: [It contains a list of URLs of the superior Entities, such as TA or SA, that MAY issue an ES related to this subject.]
+                          trust_marks:
+                            type: array
+                            items:
+                              type: object
+                            x-conditional-required: Must if not TA (only for leaf and intermediate)
+                            enum: ["id","trust_mark"]
+                        x-requirements:
+                              description: |
+                                `iss` must be equal to `sub`.
+                      signature:
+                        type: string
+                        description: The signature section of the JWT, encoded in Base64.
+                        example: "sQ5c3G...lZG8="
+        '404':
+          description: Not found - if the `.well-known` endpoint is unavailable
+        '500':
+          description: Internal server error
+components:
+  schemas:
+    JWTRequest:
+      type: object
+      required:
+        - header
+        - payload
+        - signature
+      properties:
+        header:
+          type: object
+          description: Header section of the JWT
+          required:
+            - alg
+            - kid
+          properties:
+            alg:
+              type: string
+              description: Algorithm used to sign the JWT (e.g., RS256, ES256).
+              example: RS256
+            kid:
+              type: string
+              description: indicate which key should be used to verify the token's signature.
+              example: 1b94c
+        payload:
+          type: object
+          description: Payload section of the JWT containing federation claims
+          required:
+            - iss
+            - sub
+            - client_id
+            - code_challenge
+            - code_challenge_method
+            - nonce
+            - prompt
+            - redirect_uri
+            - response_type
+            - scope
+            - acr_values
+            - claims
+            - state
+            - iat
+            - aud
+            - ui_locales
+          properties:
+            iss:
+              type: string
+              format: uri
+              pattern: '^https://[^?#]+$'
+              x-comparison-parameter: $.iss == $.client_id
+            sub:
+              type: string
+              description: Subject identifier for the federation entity.
+            aud:
+              type: string 
+              pattern: '^https://[^?#]+$'
+              x-comparison-parameter: $.aud == $.metadataOP.iss
+            exp:
+              type: integer
+              format: int64
+              description: Expiration time of the JWT as a Unix timestamp.
+            iat:
+              type: integer
+              format: int64
+              x-comparison-parameter: iat < exp
+            client_id:
+              type: string
+              format: uri
+              pattern: '^https://[^?#]+$'
+              enum: [Uniquely identifies RP] 
+            code_challenge:
+              type: string
+              pattern: "^[A-Za-z0-9._~-]+$"
+              minLength: 43
+              maxLength: 128
+              x-comparison-parameter: code_challenge==$.code_challenge
+            code_challenge_method:
+              type: string
+              enum: ['plain', 'RS256']
+              x-comparison-parameter: code_challenge_method==$.code_challenge_method
+            nonce:
+              type: string
+              pattern: "^[\u0020-\u007E]{32,}$"
+            prompt:
+              type: string
+              enum: ["consent", "consent login"]
+            redirect_uri:
+              type: string
+              format: uri
+              pattern: '^https://[^?#]+$'
+              x-comparison-parameter: redirect_uri in $.metadataRP.openid_relying_party.redirect_uris
+            response_type:
+              type: string
+              enum: [code]
+              x-comparison-parameter: response_types in $.metadataRP.openid_relying_party.response_types_supported 
+            scope:
+              type: string
+              enum: [openid, openid profile, openid email, openid profile email]
+              x-comparison-parameter: $.scope == scope
+            acr_values:
+              type: string
+              format: uri
+              pattern:  "^(https://www\\.spid\\.gov\\.it/SpidL1|https://www\\.spid\\.gov\\.it/SpidL2|https://www\\.spid\\.gov\\.it/SpidL3)(\\s(https://www\\.spid\\.gov\\.it/SpidL1|https://www\\.spid\\.gov\\.it/SpidL2|https://www\\.spid\\.gov\\.it/SpidL3))*$"
+              x-comparison-parameter: '$.acr_values in $.metadataOP.acr_values_supported'
+            claims:
+              type: object
+              enum: ["given_name", "family_name", "place_of_birth", "birthdate", "gender", "fiscal_number","document_details","phone_number","phone_number_verified","landline_number","e-mail","email_verified","e_delivery_service","address"] 
+            state:
+              type: string
+              pattern: "^[\u0020-\u007E]{32,}$"
+            ui_locales:
+              type: string
+              pattern: "^([a-zA-Z]{2,3}([a-zA-Z]{4})?([a-zA-Z]{2})?)( ([a-zA-Z]{2,3}([a-zA-Z]{4})?([a-zA-Z]{2})?))*$"
+          x-requirements:
+                description: |
+                  `iss` must be equal to `sub`.
+        signature:
+          type: string
+          description: The signature section of the JWT, encoded in Base64.
+          example: "sQ5c3G...lZG8="
+    TrustMarks:
+      type: object
+      required:
+        - header
+        - payload
+        - signature
+      properties:
+        header:
+          type: object
+          description: Header section of the JWT
+          required:
+            - alg
+            - kid
+            - typ
+          properties:
+            alg:
+              type: string
+              description: Algorithm used to sign the JWT (e.g., RS256, ES256).
+              example: RS256
+              enum:  ["RS256", "RS512", "ES256", "ES512", "PS256", "PS512"]
+            kid:
+              type: string
+              description: indicate which key should be used to verify the token's signature.
+              example: 1b94c
+              enum: [The Key ID of the signing key used]
+            typ:
+              type: string
+              description: type of token
+              example: JWT
+              enum: [trust-mark+jwt]
+        payload:
+          type: object
+          description: Payload section of the JWT containing federation claims
+          required:
+            - iss
+            - sub
+            - id
+            - exp
+            - logo_uri
+            - ref
+            - id_code
+            - organization_type
+            - organization_name
+            - iat
+          properties:
+            iss:
+              type: string
+              format: uri
+              pattern: '^https://[^?#]+$'
+              enum: [Uniquely identifies the issuing entity]
+            sub:
+              type: string
+              description: Subject identifier for the federation entity.
+              pattern: '^https://[^?#]+$'
+              enum: [Uniquely identifies the RP]
+            id:
+              type: string 
+              pattern: '^https://[^?#]+$'
+              enum: [<TA domain>/<entity_type>/<trustmark_profile>/]
+            exp:
+              type: integer
+              format: int64
+              description: Expiration time of the JWT as a Unix timestamp.
+            iat:
+              type: integer
+              format: int64
+              x-comparison-parameter: iat < exp
+            log_uri:
+              type: string
+              format: uri
+              pattern: '^https:\/\/[a-zA-Z0-9.-]+(\/[a-zA-Z0-9._-]+)*\.svg$'
+            ref:
+              type: string
+              pattern: "^https://[^?#]+$"
+            id_code:
+              type: string
+              enum: ['plain', 'RS256']
+              x-comparison-parameter: code_challenge_method==$.code_challenge_method
+            organization_type:
+              type: string
+              enum: ['public', 'private']
+            organization_name:
+              type: string
+            email:
+              type: string
+              pattern: '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+            id_code-ipa_code:
+              type: string
+              x-conditional-required: MUST if organization_type==public
+            id_code-vat_number:
+              type: string
+              x-conditional-required: MUST if organization_type==private AND !fiscal_number
+            id_code-fiscal_number:
+              type: string
+              x-conditional-required: MUST if organization_type==private AND !vat_number
+            sa_profile:
+              type: string
+              x-conditional-required: MUST iff SA
+              enum: ["full", "light"]
+    Metadata_federation_entity:
+      type: object
+      required:
+          - payload
+      properties:
+        payload:
+          type: object
+          required:
+            - organization_name
+            - homepage_uri
+            - policy_uri
+            - contacts
+            - federation_resolve_endpoint
+          properties:
+              organization_name:
+                type: string
+              homepage_uri:
+                type: string
+                format: uri
+                pattern: '^https://[^?#]+$'
+              policy_uri:
+                type: string
+                format: uri
+                pattern: '^https://[^?#]+$'
+              logo_uri:
+                type: string
+                format: uri
+                pattern: '^https://.*\\.svg$'
+              contacts:
+                type: array
+                items:
+                  type: string
+                enum: [nstitutional certified email address (PEC) of the entity]
+              federation_resolve_endpoint:
+                type: string
+                format: uri
+                pattern: '^https:\/\/[a-zA-Z0-9.-]+(?:\/[a-zA-Z0-9._~-]*)*\/resolve$'
+    Metadata_openid_relying_party:
+      type: object
+      required:
+        - payload
+      properties:
+          payload:
+            type: object
+            description: Payload of openid_relying_party
+            required: 
+              - redirect_uris
+              - grant_types
+              - id_token_signed_response_alg
+              - userinfo_signed_response_alg
+              - userinfo_encrypted_response_alg
+              - userinfo_encrypted_response_enc
+              - token_endpoint_auth_method
+              - client_id
+              - client_registration_types
+              - response_types
+            properties:
+              redirect_uris:
+                type: array
+                items:
+                  type: string
+                format: uri
+                pattern: '^https://[^?#]+$'
+                enum: [HTTPS for web-based client]
+                x-comparison-parameter: redirect_uri in $.metadataRP.openid_relying_party.redirect_uris
+              grant_types:
+                type: array
+                items:
+                  type: string
+                enum:  ["authorization_code","authorization_code","refresh_token"] 
+              id_token_signed_response_alg:
+                type: string
+                enum: [MUST be the one defined in the entity statement]
+              id_token_encrypted_response_alg:
+                type: string
+                enum: [MUST be the one defined in the entity statement]
+              id_token_encrypted_response_enc:
+                type: string
+                x-conditional-required: if id_token_encrypted_response_alg
+                enum: [MUST be the one defined in the entity statement]
+              userinfo_signed_response_alg:
+                type: string
+                enum: [MUST be the one defined in the entity statement]
+              userinfo_encrypted_response_alg:
+                type: string
+                enum: [MUST be the one defined in the entity statement]
+              userinfo_encrypted_response_enc:
+                type: string
+                enum: [MUST be the one defined in the entity statement]
+              token_endpoint_auth_method:
+                type: string
+                enum:  ["private_key_jwt"]
+              client_id:
+                type: string
+                enum: [Uniquely identifies the RP]
+                pattern: '^https://[^?#]+$'
+              client_registration_types:
+                type:  array
+                items:
+                  type: string
+                enum:  ["automatic"]
+              response_types:
+                type:  array
+                items:
+                  type: string
+                enum:  ["code"]
