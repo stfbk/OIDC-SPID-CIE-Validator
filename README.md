@@ -16,6 +16,7 @@ OIDC-SPID/CIE-Validator outputs results in two modes:
 - [OIDC-SPID/CIE-Validator](#oidc-spidcie-validator)
   - [Summary](#summary)
   - [What is in this Repo](#what-is-in-this-repo)
+    - [Swagger](#swagger)
     - [Schemas](#schemas)
     - [Tool](#tool)
   - [Requirements](#requirements)
@@ -48,6 +49,14 @@ OIDC-SPID/CIE-Validator
     ├── mig_validator.py
     └── style_table.py
 ```
+### Swagger
+
+The tool supports the OpenAPI Specification (Swagger) to simplify API validation and ensure SPID/CIE OIDC compliance. Key features include:
+
+1. **Define OIDC-SPID/CIE in a Standardized Format**: The tool uses the OpenAPI Specification (OAS) v3.1.0 for API documentation and validation.
+2. **Custom Extensions**: Handles SPID/CIE-specific rules using x-comparison-parameter, x-signature, and similar fields for advanced validation.
+3. **Provided API Spec**: The repository includes a Swagger YAML file in [swagger](#swagger) directory for endpoints.
+
 
 ### Schemas
 
@@ -130,7 +139,7 @@ These inputs can be provided via command-line arguments (using `--ec <URL_EC>` o
 There are also optional arguments:
 
 - `--v`, to receive a **verbose** output
-- `--f <filename>` or `--filename <filename>`,  if you want to add a file as input, e.g., to run the tool on multiple RPs. It contains the list of URLs, where URL_EC is in the first line and URL_AR in the second. You can find the sample file as `sample_inputfile.txt`. To improve readability, blank lines between URLs are allowed. These blank lines will be ignored during processing.
+- `--f <filename>` or `--filename <filename>`,  if you want to add a file as input, e.g., to run the tool on multiple RPs. It contains the list of URLs, where URL_EC is in the first line and URL_AR in the second. See the [sample file](#sample_inputfile.txt). To improve readability, blank lines between URLs are allowed. These blank lines will be ignored during processing.
 - `--spid`, to execute SPID compliance instead of the CIE on default
 
 Example command: `sh run.sh --ec "https://testing_rp.fbk/" --ar "https://testing_rp.fbk/request"`
