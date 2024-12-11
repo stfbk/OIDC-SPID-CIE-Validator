@@ -36,6 +36,9 @@ OIDC-SPID/CIE-Validator outputs results in two modes:
 ```bash
 OIDC-SPID/CIE-Validator
 ├── run.sh
+├── swagger
+│   ├── openapi_cie.yaml
+│   ├── openapi_spid.yaml
 ├── schemas
 │   ├── ARR_body.json
 │   ├── ARR_body_SPID.json
@@ -55,7 +58,7 @@ The tool supports the OpenAPI Specification (Swagger) to simplify API validation
 
 1. **Define OIDC-SPID/CIE in a Standardized Format**: The tool uses the OpenAPI Specification (OAS) v3.1.0 for API documentation and validation.
 2. **Custom Extensions**: Handles SPID/CIE-specific rules using x-comparison-parameter, x-signature, and similar fields for advanced validation.
-3. **Provided API Spec**: The repository includes a Swagger YAML file in [swagger](#swagger) directory for endpoints.
+3. **Provided API Spec**: The repository includes Swagger YAML files in [swagger](#swagger) directory for both CIE and SPID.
 
 
 ### Schemas
