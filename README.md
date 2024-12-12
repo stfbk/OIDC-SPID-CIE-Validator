@@ -1,6 +1,6 @@
 # OIDC-SPID/CIE-Validator
 
-OIDC-SPID/CIE-Validator offers a streamlined version of [MIG](https://github.com/stfbk/mig/) [1] for Relying Parties (RPs) to perform preliminary verification of compliance with the [SPID/CIE OIDC Specification](https://docs.italia.it/italia/spid/spid-cie-oidc-docs). This includes a total of 251 tests for both the Entity Configuration (EC) response and the Authorization (AR) request. These tests verify the presence, type, expected values, unacceptable values, and the validity of the signature across all mandatory, conditional, and optional parameters, as specified in the SPID/CIE OIDC Specification.
+OIDC-SPID/CIE-Validator offers a streamlined version of [MIG](https://github.com/stfbk/mig/) [1] for Relying Parties (RPs) to perform preliminary verification of compliance with the [SPID/CIE OIDC Specification](https://docs.italia.it/italia/spid/spid-cie-oidc-docs). This includes a total of 252 tests for both the Entity Configuration (EC) response and the Authorization (AR) request. These tests verify the presence, type, expected values, unacceptable values, and the validity of the signature across all mandatory, conditional, and optional parameters, as specified in the SPID/CIE OIDC Specification.
 
 OIDC-SPID/CIE-Validator uses JSON Schemas to validate the JWT in both the EC response and request in the AR. Additionally, OIDC-SPID/CIE-Validator verifies the correctness of parameters in the EC response and AR request through script-based validation.
 
@@ -16,6 +16,7 @@ OIDC-SPID/CIE-Validator outputs results in two modes:
 - [OIDC-SPID/CIE-Validator](#oidc-spidcie-validator)
   - [Summary](#summary)
   - [What is in this Repo](#what-is-in-this-repo)
+    - [Swagger](#swagger)
     - [Schemas](#schemas)
     - [Tool](#tool)
   - [Requirements](#requirements)
@@ -35,6 +36,9 @@ OIDC-SPID/CIE-Validator outputs results in two modes:
 ```bash
 OIDC-SPID/CIE-Validator
 ├── run.sh
+├── swagger
+│   ├── openapi_cie.yaml
+│   ├── openapi_spid.yaml
 ├── schemas
 │   ├── ARR_body.json
 │   ├── ARR_body_SPID.json
@@ -48,6 +52,14 @@ OIDC-SPID/CIE-Validator
     ├── mig_validator.py
     └── style_table.py
 ```
+### Swagger
+
+The tool supports the OpenAPI Specification (Swagger) to simplify API validation and ensure SPID/CIE OIDC compliance. Key features include:
+
+1. **Define OIDC-SPID/CIE in a Standardized Format**: The tool uses the OpenAPI Specification (OAS) v3.1.0 for API documentation and validation.
+2. **Custom Extensions**: Handles SPID/CIE-specific rules using x-comparison-parameter, x-signature, and similar fields for advanced validation.
+3. **Provided API Spec**: The repository includes Swagger YAML files in [swagger](#swagger) directory for both CIE and SPID.
+
 
 ### Schemas
 
@@ -130,7 +142,7 @@ These inputs can be provided via command-line arguments (using `--ec <URL_EC>` o
 There are also optional arguments:
 
 - `--v`, to receive a **verbose** output
-- `--f <filename>` or `--filename <filename>`, if you want to add a file as a input, e.g., to run the tool on multiple RPs. It contains the list of URLs, where URL_EC is in the first line and URL_AR in the second.
+- `--f <filename>` or `--filename <filename>`,  if you want to add a file as input, e.g., to run the tool on multiple RPs. It contains the list of URLs, where URL_EC is in the first line and URL_AR in the second. See the [sample file](sample_inputfile.txt). To improve readability, blank lines between URLs are allowed. These blank lines will be ignored during processing.
 - `--spid`, to execute SPID compliance instead of the CIE on default
 
 Example command: `sh run.sh --ec "https://testing_rp.fbk/" --ar "https://testing_rp.fbk/request"`
