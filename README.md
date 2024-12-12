@@ -142,7 +142,7 @@ These inputs can be provided via command-line arguments (using `--ec <URL_EC>` o
 There are also optional arguments:
 
 - `--v`, to receive a **verbose** output
-- `--f <filename>` or `--filename <filename>`,  if you want to add a file as input, e.g., to run the tool on multiple RPs. It contains the list of URLs, where URL_EC is in the first line and URL_AR in the second. See the [sample file](#sample_inputfile.txt). To improve readability, blank lines between URLs are allowed. These blank lines will be ignored during processing.
+- `--f <filename>` or `--filename <filename>`,  if you want to add a file as input, e.g., to run the tool on multiple RPs. It contains the list of URLs, where URL_EC is in the first line and URL_AR in the second. See the [sample file](sample_inputfile.txt). To improve readability, blank lines between URLs are allowed. These blank lines will be ignored during processing.
 - `--spid`, to execute SPID compliance instead of the CIE on default
 
 Example command: `sh run.sh --ec "https://testing_rp.fbk/" --ar "https://testing_rp.fbk/request"`
