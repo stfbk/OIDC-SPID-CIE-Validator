@@ -1,5 +1,6 @@
 import argparse
 from datetime import datetime
+from doctest import TestResults
 from urllib.parse import urlparse
 import os
 
@@ -55,7 +56,7 @@ def style_id_md(id, test_result):
 
 #Function to style the Markdown result with colors using inline HTML
 def style_result_md(result):
-    if result in ["[WARNING]", "[SKIPPED]", "SKIPPED"]:
+    if result in ["[WARNING]", "[MISSING]", "MISSING","[SKIPPED]","SKIPPED"]:
         return f"<span style='color: orange;'>**{result}**</span>"
     elif result in ["PASSED", "[PASSED]"]:
         return f"<span style='color: green;'>**{result}**</span>"
@@ -79,7 +80,7 @@ def print_table_in_terminal(test_results):
     for test in test_results:
         # Style the Test Result column
         result_text = Text(test["Test Result"])
-        if test["Test Result"] in ["[WARNING]", "[SKIPPED]", "SKIPPED"]:
+        if test["Test Result"] in ["[WARNING]", "[MISSING]", "MISSING","[SKIPPED]","SKIPPED"]:
             result_text.stylize("bold yellow")
         elif test["Test Result"] in ["PASSED", "[PASSED]"]:
             result_text.stylize("bold green")
@@ -178,9 +179,9 @@ if __name__ == "__main__":
         VERBOSE = True
 
     # Print the table in terminal with colors
-    print_table_in_terminal(test_results)
+    print_table_in_terminal(TestResults)
     
     # Write the table to markdown file with colors
-    write_table_to_md(test_results, OUTPUT_MD_FILE)
+    write_table_to_md(TestResults, OUTPUT_MD_FILE)
 
     print(f"\nVerbose markdown table has been written to {OUTPUT_MD_FILE}")
