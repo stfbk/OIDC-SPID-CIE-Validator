@@ -363,7 +363,8 @@ class ECValidator(Validator):
 
         # f. $.authority_hints
         param_manager.update_value("authority_hints", decoded_body.get('authority_hints', {}), param_manager.saved_param)              
-
+    
+    
 class TMValidator(Validator):
     def __init__(self, tm_number):
         self.tm_number = tm_number
@@ -474,7 +475,13 @@ class ARValidator(Validator):
         else:
             test_manager.append_test(param_manager.increment_value("AR", param_manager.section), "code_challenge_method", bool(self.ar_params.get('code_challenge_method')), f"The code_challenge_method parameter MUST be present in the HTTP message of Authorization Request.")
 
+    
+class JWKSValidator(Validator):
+    def __init__(self):
+        pass
 
+    def validate(self, jwks_uri_jwt: str, input_data: Dict[str, Any], msg: str) -> None:
+        super().validate(jwks_uri_jwt, input_data, msg)
 
 #Reset all for restart
 def reset_all():
@@ -575,7 +582,22 @@ def init(url_rp, url_ar, schemas):
                     validator.validate(trust_mark_jwt, schemas, f"TM{i}")
             else:
                 test_manager.append_test(section_TM, f"JWT Trust Mark", "[FAILED]", "The Trust Mark MUST be present.")
+            
+            if is_spid:
+                signed_jwks_uri = (validator.get_decoded_body())['metadata']['openid_relying_party'].get('signed_jwks_uri')
+                if signed_jwks_uri:
+                    try:
+                        response = requests.get(signed_jwks_uri, allow_redirects=True)
+                    except Exception as e:
+                        console.print(f"[ERROR] Downloading has failed: {str(e)}", style="bold red")
+                        pass
+                
+                    if response:
+                        jose_input = (response.content).decode('ascii')
+                        #decoded_body = jwt.decode(jose_input.replace('\n',''), options={"verify_signature": False})
 
+                        validator = JWKSValidator()
+                        validator.validate(jose_input, schemas, "JWKS")
 
     else:
         test_manager.update_test("1", "Test Result", "[SKIPPED]")
