@@ -234,11 +234,11 @@ class Validator(ABC):
         kid = param_manager.get_value(kid, param_manager.saved_param)
         
         if not kid:
-            test_manager.append_test(section, "Signature", "[MISSING]", "The PUBLIC_KEY is missing, missing kid. Cannot perform the check")
+            test_manager.append_test(section, "Signature", "[SKIPPED]", "The PUBLIC_KEY is missing, missing kid. Cannot perform the check")
             return
 
         if not url_rp:
-            test_manager.append_test(section, "Signature", "[MISSING]", "The PUBLIC_KEY is missing, missing URL. Cannot perform the check")
+            test_manager.append_test(section, "Signature", "[SKIPPED]", "The PUBLIC_KEY is missing, missing URL. Cannot perform the check")
             return
         
         try:
@@ -576,7 +576,7 @@ def init(url_rp, url_ar, schemas):
 
 
     else:
-        test_manager.update_test("1", "Test Result", "[MISSING]")
+        test_manager.update_test("1", "Test Result", "[SKIPPED]")
         test_manager.update_test("1", "Reason/Mitigation", "URL not provided")
 
     #Analyzing AR
@@ -607,7 +607,7 @@ def init(url_rp, url_ar, schemas):
             validator.validate(jwt_input, schemas, "ARR")
     else:
         test_manager.update_test("2", "Reason/Mitigation", "URL not provided")
-        test_manager.update_test("2", "Test Result", "[MISSING]")
+        test_manager.update_test("2", "Test Result", "[SKIPPED]")
     
     test_manager.update_parent_test(test_manager.simple_output)
 
