@@ -1,5 +1,6 @@
 import argparse
 from datetime import datetime
+from doctest import TestResults
 from urllib.parse import urlparse
 import os
 
@@ -178,9 +179,9 @@ if __name__ == "__main__":
         VERBOSE = True
 
     # Print the table in terminal with colors
-    print_table_in_terminal(test_results)
+    print_table_in_terminal(TestResults)
     
     # Write the table to markdown file with colors
-    write_table_to_md(test_results, OUTPUT_MD_FILE)
+    write_table_to_md(TestResults, OUTPUT_MD_FILE)
 
     print(f"\nVerbose markdown table has been written to {OUTPUT_MD_FILE}")
