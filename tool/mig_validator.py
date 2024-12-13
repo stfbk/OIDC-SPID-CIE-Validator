@@ -43,7 +43,7 @@ class TestManager:
     def change_error_message(msg: str) -> tuple[str, str]:
         param_name = msg.split("'")[1]
         message = msg.split("'")[-1]
-        return param_name, f"This{message}. The property {param_name} is skipped in the JSON."
+        return param_name, f"This{message}. The property {param_name} is missing in the JSON."
     
     #Method to add a new entry
     def append_test(self, id: str, test_name: str, test_result: Union[str, bool], reason: str):
@@ -234,11 +234,11 @@ class Validator(ABC):
         kid = param_manager.get_value(kid, param_manager.saved_param)
         
         if not kid:
-            test_manager.append_test(section, "Signature", "[SKIPPED]", "The PUBLIC_KEY is skipped, skipped kid. Cannot perform the check")
+            test_manager.append_test(section, "Signature", "[MISSING]", "The PUBLIC_KEY is missing, missing kid. Cannot perform the check")
             return
 
         if not url_rp:
-            test_manager.append_test(section, "Signature", "[SKIPPED]", "The PUBLIC_KEY is skipped, skipped URL. Cannot perform the check")
+            test_manager.append_test(section, "Signature", "[MISSING]", "The PUBLIC_KEY is missing, missing URL. Cannot perform the check")
             return
         
         try:
@@ -362,7 +362,7 @@ class ECValidator(Validator):
             param_manager.update_value("response_type", decoded_body['metadata']['openid_relying_party'].get('response_types', []), param_manager.saved_param)
 
         # f. $.authority_hints
-        param_manager.update_value("authority_hints", decoded_body.get('authority_hints', {}), param_manager.saved_param)
+        param_manager.update_value("authority_hints", decoded_body.get('authority_hints', {}), param_manager.saved_param)              
 
 class TMValidator(Validator):
     def __init__(self, tm_number):
@@ -474,6 +474,8 @@ class ARValidator(Validator):
         else:
             test_manager.append_test(param_manager.increment_value("AR", param_manager.section), "code_challenge_method", bool(self.ar_params.get('code_challenge_method')), f"The code_challenge_method parameter MUST be present in the HTTP message of Authorization Request.")
 
+
+
 #Reset all for restart
 def reset_all():
     global url_rp
@@ -576,7 +578,7 @@ def init(url_rp, url_ar, schemas):
 
 
     else:
-        test_manager.update_test("1", "Test Result", "[MISSING]")
+        test_manager.update_test("1", "Test Result", "[SKIPPED]")
         test_manager.update_test("1", "Reason/Mitigation", "URL not provided")
 
     #Analyzing AR
@@ -607,7 +609,7 @@ def init(url_rp, url_ar, schemas):
             validator.validate(jwt_input, schemas, "ARR")
     else:
         test_manager.update_test("2", "Reason/Mitigation", "URL not provided")
-        test_manager.update_test("2", "Test Result", "[MISSING]")
+        test_manager.update_test("2", "Test Result", "[SKIPPED]")
     
     test_manager.update_parent_test(test_manager.simple_output)
 

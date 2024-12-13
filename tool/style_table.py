@@ -56,7 +56,7 @@ def style_id_md(id, test_result):
 
 #Function to style the Markdown result with colors using inline HTML
 def style_result_md(result):
-    if result in ["[WARNING]", "[MISSING]", "MISSING","[SKIPPED]","SKIPPED"]:
+    if result in ["[WARNING]", "[SKIPPED]", "SKIPPED"]:
         return f"<span style='color: orange;'>**{result}**</span>"
     elif result in ["PASSED", "[PASSED]"]:
         return f"<span style='color: green;'>**{result}**</span>"
@@ -80,7 +80,7 @@ def print_table_in_terminal(test_results):
     for test in test_results:
         # Style the Test Result column
         result_text = Text(test["Test Result"])
-        if test["Test Result"] in ["[WARNING]", "[MISSING]", "MISSING","[SKIPPED]","SKIPPED"]:
+        if test["Test Result"] in ["[WARNING]", "[SKIPPED]", "SKIPPED"]:
             result_text.stylize("bold yellow")
         elif test["Test Result"] in ["PASSED", "[PASSED]"]:
             result_text.stylize("bold green")
