@@ -474,8 +474,6 @@ class ARValidator(Validator):
         else:
             test_manager.append_test(param_manager.increment_value("AR", param_manager.section), "code_challenge_method", bool(self.ar_params.get('code_challenge_method')), f"The code_challenge_method parameter MUST be present in the HTTP message of Authorization Request.")
 
-
-
 #Reset all for restart
 def reset_all():
     global url_rp
@@ -624,7 +622,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Tool for processing URLs given the URL to the Relying Party Metadata (url_rp) and the Authorization Request")
 
     #Admitted arguments
-    parser.add_argument('--ec', type=str, help='Specify the URL to get RP Metadata.\nExample: https://example.com/relying-party/')
+    parser.add_argument('--eid', type=str, help='Specify the URL to get RP Metadata.\nExample: https://example.com/relying-party/')
     parser.add_argument('--ar', type=str, help='Specify the Authorization Request URL.\nExample: https://example.com/client_id=hsajkd&')
     parser.add_argument('-f', '--filename', type=str, help='Specify a file including both RP URLs and AR URLs, where RP stays on the line before its AR.')
     parser.add_argument('--verbose', action='store_true', help='Specify for a verbose output.')
@@ -634,7 +632,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     #Extract arguments
-    url_rp = args.ec
+    url_rp = args.eid
     url_ar = args.ar
     is_spid = args.spid
     inputFile = args.filename
