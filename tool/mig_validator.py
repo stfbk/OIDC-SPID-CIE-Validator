@@ -363,8 +363,7 @@ class ECValidator(Validator):
 
         # f. $.authority_hints
         param_manager.update_value("authority_hints", decoded_body.get('authority_hints', {}), param_manager.saved_param)              
-    
-    
+
 class TMValidator(Validator):
     def __init__(self, tm_number):
         self.tm_number = tm_number
@@ -474,8 +473,7 @@ class ARValidator(Validator):
             test_manager.append_test(param_manager.increment_value("AR", param_manager.section), "code_challenge_method==$.code_challenge_method", codeChallengeMethod_decoded in code_challenge_method, f"The code_challenge_method in the HTTP message and JWT Request of Authorization Request MUST be present and have the same value.\n  code_challenge_method: {code_challenge_method}\n  $.code_challenge_method: {codeChallengeMethod_decoded}")
         else:
             test_manager.append_test(param_manager.increment_value("AR", param_manager.section), "code_challenge_method", bool(self.ar_params.get('code_challenge_method')), f"The code_challenge_method parameter MUST be present in the HTTP message of Authorization Request.")
-
-    
+   
 class JWKSValidator(Validator):
     def __init__(self):
         pass

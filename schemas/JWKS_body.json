@@ -1,54 +1,34 @@
 {
   "type": "object",
   "properties": {
-    "keys": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "oneOf": [
-          {
-            "properties": {
-              "kty": {
-                "type": "string",
-                "const": "RSA"
-              },
-              "kid": {
-                "type": "string"
-              },
-              "n": {
-                "type": "string"
-              },
-              "e": {
-                "type": "string"
-              }
+    "type": "object",
+    "properties": {
+      "keys": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "kty": {
+              "type": "string"
             },
-            "required": ["kty", "kid", "n", "e"],
-            "additionalProperties": false
+            "use": {
+              "type": "string"
+            },
+            "n": {
+              "type": "string"
+            },
+            "e": {
+              "type": "string"
+            },
+            "kid": {
+              "type": "string"
+            }
           },
-          {
-            "properties": {
-              "kty": {
-                "type": "string",
-                "const": "EC"
-              },
-              "kid": {
-                "type": "string"
-              },
-              "crv": {
-                "type": "string",
-                "enum": ["P-256", "P-384", "P-521"]
-              },
-              "x": {
-                "type": "string"
-              },
-              "y": {
-                "type": "string"
-              }
-            },
-            "required": ["kty", "kid", "crv", "x", "y"],
-            "additionalProperties": false
-          }
-        ]
+          "required": [
+            "kty",
+            "kid"
+          ]
+        }
       }
     },
     "iss": {
@@ -62,8 +42,15 @@
     "iat": {
       "type": "integer",
       "minimum": 0
+    },
+    "exp": {
+      "type": "integer",
+      "minimum": 0
     }
   },
-  "required": ["keys", "iss", "sub"],
-  "additionalProperties": false
+  "required": [
+    "keys",
+    "iss",
+    "sub"
+  ]
 }
