@@ -227,7 +227,7 @@
             "logo_uri": {
               "type": "string",
               "format": "uri",
-              "pattern": "^https://.*\\.svg$"
+              "pattern": "^https://.*\\.svg"
             },
             "contacts": {
               "type": "array",
