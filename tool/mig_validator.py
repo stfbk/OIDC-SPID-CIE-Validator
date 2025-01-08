@@ -97,10 +97,6 @@ class TestManager:
                         self.update_test(parent_id, "Test Result", "[PASSED]")
                         self.update_test(parent_id, "Reason/Mitigation", "All subtests passed.")
 
-    #Method to reset to initial state
-    def reset(self):
-        self.__init__()
-
 #Class to handle saved params
 class ParamManager:
     #Define the two main dictionaries, one for section and one for params
@@ -167,14 +163,18 @@ class ParamManager:
                         #Update defaultRSA
                         self.update_value("kid_defaultRSASign", k["kid"], self.saved_param)
 
-    #Method to reset param_store to the original state
-    def reset(self):
-        self.__init__()
-
 #Class that provides methods for validating various data formats, .g., schema, signature
 class Validator(ABC):
+    test_manager = TestManager()
+    param_manager = ParamManager()
+
     def __init__(self):
         pass
+
+    @classmethod
+    def reset_managers(cls):
+        cls.test_manager = TestManager()
+        cls.param_manager = ParamManager()
 
     @abstractmethod
     def validate(self, jwt_input: str, input_data: Dict[str, Any], msg: str) -> None:
@@ -183,7 +183,7 @@ class Validator(ABC):
                 jwt_input = jwt_input[0]
             self.decoded_body, self.alg, self.kid = Validator.validate_and_decode_jwt(input_data, jwt_input, msg)
             self.additional_checks(self.decoded_body, self.kid)
-            Validator.validate_signature(jwt_input, self.alg, param_manager.get_value(msg, param_manager.section), self.kid)
+            Validator.validate_signature(jwt_input, self.alg, Validator.param_manager.get_value(msg, Validator.param_manager.section), self.kid)
 
     @abstractmethod
     def additional_checks(decoded_body: str, kid: str):
@@ -201,7 +201,7 @@ class Validator(ABC):
     def validate_schema (part:dict, schema:dict, which_schema:str, msg:str):
         #part = {'kid': 'E6BBD2AF6E03374BC8BF51E48C40C39C90177AED', 'typ': 'entity-statement+jwt', 'alg': 'RS256'}
         msg = msg + " " + which_schema
-        main_id = ".".join(param_manager.get_value(msg, param_manager.section).split(".")[:-1])
+        main_id = ".".join(Validator.param_manager.get_value(msg, Validator.param_manager.section).split(".")[:-1])
 
         try:
             validator = Draft202012Validator(schema)
@@ -209,20 +209,20 @@ class Validator(ABC):
 
             if errors:
                 #which_schema dice se header o payload, msg dice se EC, AR o TM{i}
-                test_manager.append_test(main_id, "JWT "+ which_schema, "[FAILED]", "")
+                Validator.test_manager.append_test(main_id, "JWT "+ which_schema, "[FAILED]", "")
 
                 for i, error in enumerate(errors, 1):
                     # Format the error path (handle nested paths)
                     path_error = ".".join(str(p) for p in error.path) or ""
                     if path_error:
-                        test_manager.append_test(param_manager.increment_value(msg, param_manager.section), "$."+path_error, "FAILED", error.message)
+                        Validator.test_manager.append_test(Validator.param_manager.increment_value(msg, Validator.param_manager.section), "$."+path_error, "FAILED", error.message)
                     else:
-                        keyitem, message = test_manager.change_error_message(error.message)
-                        test_manager.append_test(param_manager.increment_value(msg, param_manager.section), "$."+keyitem , "FAILED", message)
+                        keyitem, message = Validator.test_manager.change_error_message(error.message)
+                        Validator.test_manager.append_test(Validator.param_manager.increment_value(msg, Validator.param_manager.section), "$."+keyitem , "FAILED", message)
                 
             else:
                 #No error, for sure the main ID, e.g, Header, Payload, Signature
-                test_manager.append_test(main_id, "JWT " + which_schema, "[PASSED]", "")
+                Validator.test_manager.append_test(main_id, "JWT " + which_schema, "[PASSED]", "")
 
         except Exception as e:
             console.print(f"[ERROR] Unexpected error during schema validation: {str(e)}", style="bold red")
@@ -231,14 +231,14 @@ class Validator(ABC):
     def validate_signature (jwt_input: Dict[str, Any], alg: int, section: str, kid: str):
         if kid == "defaultRSASign":
             kid="kid_defaultRSASign"
-        kid = param_manager.get_value(kid, param_manager.saved_param)
+        kid = Validator.param_manager.get_value(kid, Validator.param_manager.saved_param)
         
         if not kid:
-            test_manager.append_test(section, "Signature", "[MISSING]", "The PUBLIC_KEY is missing, missing kid. Cannot perform the check")
+            Validator.test_manager.append_test(section, "Signature", "[MISSING]", "The PUBLIC_KEY is missing, missing kid. Cannot perform the check")
             return
 
         if not url_rp:
-            test_manager.append_test(section, "Signature", "[MISSING]", "The PUBLIC_KEY is missing, missing URL. Cannot perform the check")
+            Validator.test_manager.append_test(section, "Signature", "[MISSING]", "The PUBLIC_KEY is missing, missing URL. Cannot perform the check")
             return
         
         try:
@@ -250,20 +250,20 @@ class Validator(ABC):
                 options={"verify_aud": False, "verify_exp": False},
                 leeway=300 #5minutes
             )
-            test_manager.append_test(section, "Signature", "[PASSED]", "The signature for JWT is valid and correct.")
+            Validator.test_manager.append_test(section, "Signature", "[PASSED]", "The signature for JWT is valid and correct.")
         except InvalidTokenError as e:
-            test_manager.append_test(section, "Signature", "[FAILED]", f"Signature for JWT failed: {str(e)}")
+            Validator.test_manager.append_test(section, "Signature", "[FAILED]", f"Signature for JWT failed: {str(e)}")
         except Exception as e:
-            test_manager.append_test(section, "Signature", "[ERROR]", f"An unexpected error occurred: {str(e)}")
+            Validator.test_manager.append_test(section, "Signature", "[ERROR]", f"An unexpected error occurred: {str(e)}")
 
     @classmethod
     def validate_and_decode_jwt(cls, schemas:dict, jwt_input:str, msg:str):
         #Add Header and Payload
-        param_manager.add_value(msg+" Header", param_manager.increment_value(msg, param_manager.section)+".1", param_manager.section)
-        param_manager.add_value(msg+" Payload", param_manager.increment_value(msg, param_manager.section)+".1", param_manager.section)
+        cls.param_manager.add_value(msg+" Header", cls.param_manager.increment_value(msg, cls.param_manager.section)+".1", cls.param_manager.section)
+        cls.param_manager.add_value(msg+" Payload", cls.param_manager.increment_value(msg, cls.param_manager.section)+".1", cls.param_manager.section)
         
         #Check if it is REALLY a JWT, if not raise an Error
-        test_manager.append_test(param_manager.increment_value(msg, param_manager.section), "Valid JWT", cls.is_jwt(jwt_input), f"It MUST be a valid JWT")
+        cls.test_manager.append_test(cls.param_manager.increment_value(msg, cls.param_manager.section), "Valid JWT", cls.is_jwt(jwt_input), f"It MUST be a valid JWT")
 
         if cls.is_jwt (jwt_input):
             #For TM there is the number only on the message but not on the schema
@@ -320,9 +320,9 @@ class ECValidator(Validator):
         iss = decoded_body.get('iss', "")
         sub = decoded_body.get('sub', "")
         if iss and sub:
-            test_manager.append_test(param_manager.increment_value("EC Payload", param_manager.section), "$.iss == $.sub", iss==sub, f"Both issuer and subject value in Entity Configuration JWT MUST be present and have the same value\n  iss: {iss}\n  sub: {sub}")
+            Validator.test_manager.append_test(Validator.param_manager.increment_value("EC Payload", Validator.param_manager.section), "$.iss == $.sub", iss==sub, f"Both issuer and subject value in Entity Configuration JWT MUST be present and have the same value\n  iss: {iss}\n  sub: {sub}")
         # save iss
-        param_manager.update_value("iss", iss, param_manager.saved_param)
+        Validator.param_manager.update_value("iss", iss, Validator.param_manager.saved_param)
 
         #Second check: $.[iat] < $.[exp]
         iat = decoded_body.get('iat')
@@ -330,39 +330,39 @@ class ECValidator(Validator):
         if iat and exp:
             exp_date = datetime.fromtimestamp(int(exp), timezone.utc)
             iat_date = datetime.fromtimestamp(int(iat), timezone.utc)
-            test_manager.append_test(param_manager.increment_value("EC Payload", param_manager.section), "$.iat < $.exp", (iat<exp), f"The issuance date, {str(iat_date)}, MUST be earlier than the expiration date, {str(exp_date)}.")
-            test_manager.append_test(param_manager.increment_value("EC Payload", param_manager.section), "current_time < $.exp", (time.time()<exp), f"The expiration date MUST be valid and not passed. The expiration date is: {str(exp_date)}")
+            Validator.test_manager.append_test(Validator.param_manager.increment_value("EC Payload", Validator.param_manager.section), "$.iat < $.exp", (iat<exp), f"The issuance date, {str(iat_date)}, MUST be earlier than the expiration date, {str(exp_date)}.")
+            Validator.test_manager.append_test(Validator.param_manager.increment_value("EC Payload", Validator.param_manager.section), "current_time < $.exp", (time.time()<exp), f"The expiration date MUST be valid and not passed. The expiration date is: {str(exp_date)}")
         else:
             exp_date = ""
 
         keys = decoded_body.get('jwks', {}).get('keys', [])
-        param_manager.save_kid(keys)
+        Validator.param_manager.save_kid(keys)
         
         #Data to be saved:
         # a. exp_date
-        param_manager.update_value("exp_date", exp_date, param_manager.saved_param)
+        Validator.param_manager.update_value("exp_date", exp_date, Validator.param_manager.saved_param)
 
         if bool(decoded_body.get('metadata',{}).get('openid_relying_party',{})):
             #Third check: $.metadata.openid_relying_party[client_id] == URL_RP
             client_id = decoded_body['metadata']['openid_relying_party'].get('client_id')
             if client_id and iss:
-                test_manager.append_test(param_manager.increment_value("EC Payload", param_manager.section), "$.metadata.openid_relying_party[client_id] == issuer", client_id == iss, f"The client_id from Entity Configuration Payload JSON in the path of '$.metadata.openid_relying_party' MUST be an HTTPS URL that uniquely identifies the RP:\n  client_id: {client_id}\n issuer: {iss}")
+                Validator.test_manager.append_test(Validator.param_manager.increment_value("EC Payload", Validator.param_manager.section), "$.metadata.openid_relying_party[client_id] == issuer", client_id == iss, f"The client_id from Entity Configuration Payload JSON in the path of '$.metadata.openid_relying_party' MUST be an HTTPS URL that uniquely identifies the RP:\n  client_id: {client_id}\n issuer: {iss}")
             
             # b. public_pem
             jwk_keys = decoded_body['metadata']['openid_relying_party'].get('jwks', {}).get('keys', [])
-            param_manager.save_kid(jwk_keys)
+            Validator.param_manager.save_kid(jwk_keys)
             
             # e1. Check it is the same of the one in header
-            test_manager.append_test(param_manager.increment_value("EC Payload", param_manager.section), "kid == $.metadata.openid_relying_party.jwks.keys[kid]", kid in param_manager.saved_param, "The kid in the header MUST be the same of the signing kid in the metadata")
+            Validator.test_manager.append_test(Validator.param_manager.increment_value("EC Payload", Validator.param_manager.section), "kid == $.metadata.openid_relying_party.jwks.keys[kid]", kid in Validator.param_manager.saved_param, "The kid in the header MUST be the same of the signing kid in the metadata")
 
             # c. $.metadata.openid_relying_party[redirect_uris]
-            param_manager.update_value("redirect_uris", decoded_body['metadata']['openid_relying_party'].get('redirect_uris', []), param_manager.saved_param)
+            Validator.param_manager.update_value("redirect_uris", decoded_body['metadata']['openid_relying_party'].get('redirect_uris', []), Validator.param_manager.saved_param)
 
             # d. $.metadata.openid_relying_party[response_type]
-            param_manager.update_value("response_type", decoded_body['metadata']['openid_relying_party'].get('response_types', []), param_manager.saved_param)
+            Validator.param_manager.update_value("response_type", decoded_body['metadata']['openid_relying_party'].get('response_types', []), Validator.param_manager.saved_param)
 
         # f. $.authority_hints
-        param_manager.update_value("authority_hints", decoded_body.get('authority_hints', {}), param_manager.saved_param)              
+        Validator.param_manager.update_value("authority_hints", decoded_body.get('authority_hints', {}), Validator.param_manager.saved_param)              
 
 class TMValidator(Validator):
     def __init__(self, tm_number):
@@ -374,23 +374,23 @@ class TMValidator(Validator):
     def additional_checks(self, tm_body: list, kid:str):
             #First check: $.[sub]==url_rp
             sub = tm_body.get('sub')
-            test_manager.append_test(param_manager.increment_value(f"TM{self.tm_number} Payload", param_manager.section), "$.sub == URL_RP", sub==url_rp, f"The subject in the Trust Mark MUST be present and have the same value of URL Relying Party\n  sub: {sub}\n  url_rp: {url_rp}")
+            Validator.test_manager.append_test(Validator.param_manager.increment_value(f"TM{self.tm_number} Payload", Validator.param_manager.section), "$.sub == URL_RP", sub==url_rp, f"The subject in the Trust Mark MUST be present and have the same value of URL Relying Party\n  sub: {sub}\n  url_rp: {url_rp}")
 
             #Second check: check kid parameter
-            test_manager.append_test(param_manager.increment_value(f"TM{self.tm_number} Payload", param_manager.section), "$.kid in $.metadata.openid_relying_party.jwks.keys[kid]", kid in param_manager.saved_param, f"The kid value in the header of the jwt of the Trust Mark MUST be the same of the kid value in the jwks of the Metadata RP.")
+            Validator.test_manager.append_test(Validator.param_manager.increment_value(f"TM{self.tm_number} Payload", Validator.param_manager.section), "$.kid in $.metadata.openid_relying_party.jwks.keys[kid]", kid in Validator.param_manager.saved_param, f"The kid value in the header of the jwt of the Trust Mark MUST be the same of the kid value in the jwks of the Metadata RP.")
 
             #Third check: check iss is in auth_hints
             iss = tm_body.get('iss')
-            authority_hints = param_manager.get_value("authority_hints", param_manager.saved_param)
-            test_manager.append_test(param_manager.increment_value(f"TM{self.tm_number} Payload", param_manager.section), "$.iss in $.authority_hints", iss in authority_hints, f"The iss of the Trust Mark MUST be a superior entity, i.e., authority_hints in the Metadata\n iss: {iss}\n authority_hints: {authority_hints}")
+            authority_hints = Validator.param_manager.get_value("authority_hints", Validator.param_manager.saved_param)
+            Validator.test_manager.append_test(Validator.param_manager.increment_value(f"TM{self.tm_number} Payload", Validator.param_manager.section), "$.iss in $.authority_hints", iss in authority_hints, f"The iss of the Trust Mark MUST be a superior entity, i.e., authority_hints in the Metadata\n iss: {iss}\n authority_hints: {authority_hints}")
 
             #Fourth check: expiration date must be valid
             exp = tm_body.get('exp', 0)
             iat = tm_body.get('iat', 0)
             if exp:
                 exp_date = datetime.fromtimestamp(int(exp), timezone.utc)
-                test_manager.append_test(param_manager.increment_value(f"TM{self.tm_number} Payload", param_manager.section), "current_time < $.exp", (time.time()<exp), f"The expiration date MUST be valid and not passed\n  expiration: {str(exp_date)}")
-                test_manager.append_test(param_manager.increment_value(f"TM{self.tm_number} Payload", param_manager.section), "$.iat < $.exp", (iat<exp), f"The expiration date MUST be valid and not passed\n  expiration: {str(exp_date)}")
+                Validator.test_manager.append_test(Validator.param_manager.increment_value(f"TM{self.tm_number} Payload", Validator.param_manager.section), "current_time < $.exp", (time.time()<exp), f"The expiration date MUST be valid and not passed\n  expiration: {str(exp_date)}")
+                Validator.test_manager.append_test(Validator.param_manager.increment_value(f"TM{self.tm_number} Payload", Validator.param_manager.section), "$.iat < $.exp", (iat<exp), f"The expiration date MUST be valid and not passed\n  expiration: {str(exp_date)}")
 
 class ARValidator(Validator):
     def __init__(self, ar_params):
@@ -402,84 +402,88 @@ class ARValidator(Validator):
     def additional_checks(self, decoded_body: str, kid:str):
         #First Check: $.[client_id] == iss
         client_id_body = decoded_body.get('client_id')
-        iss = param_manager.get_value('iss', param_manager.saved_param)
-        test_manager.append_test(param_manager.increment_value("ARR Payload", param_manager.section), "$.client_id == iss of RP's EntityConfiguration", (client_id_body==iss), f"The client_id in the payload of the JWT Authorization Request MUST be present AND equal to the URL of the Relying Party\n  $.client_id: {client_id_body}\n  iss: {iss}")
+        iss = Validator.param_manager.get_value('iss', Validator.param_manager.saved_param)
+        Validator.test_manager.append_test(Validator.param_manager.increment_value("ARR Payload", Validator.param_manager.section), "$.client_id == iss of RP's EntityConfiguration", (client_id_body==iss), f"The client_id in the payload of the JWT Authorization Request MUST be present AND equal to the URL of the Relying Party\n  $.client_id: {client_id_body}\n  iss: {iss}")
 
         #Second check: # $.[redirect_uri] is in body of the EC $.metadata.openid_relying_party[redirect_uris]
         redirect_uri = decoded_body.get('redirect_uri')
-        redirect_uris = param_manager.get_value("redirect_uris", param_manager.saved_param)
-        test_manager.append_test(param_manager.increment_value("ARR Payload", param_manager.section), "$.redirect_uri in $.metadata.openid_relying_party[redirect_uris]", redirect_uri is not None and redirect_uri in redirect_uris, f"The redirect_uri in the payload of the JWT Authorization Request payload MUST be present AND in the list of the redirect_uris provided in the Entity Configuration payload\n  $.redirect_uri: {redirect_uri}\n  $.metadata.openid_relying_party.redirect_uris: {redirect_uris}")
+        redirect_uris = Validator.param_manager.get_value("redirect_uris", Validator.param_manager.saved_param)
+        Validator.test_manager.append_test(Validator.param_manager.increment_value("ARR Payload", Validator.param_manager.section), "$.redirect_uri in $.metadata.openid_relying_party[redirect_uris]", redirect_uri is not None and redirect_uri in redirect_uris, f"The redirect_uri in the payload of the JWT Authorization Request payload MUST be present AND in the list of the redirect_uris provided in the Entity Configuration payload\n  $.redirect_uri: {redirect_uri}\n  $.metadata.openid_relying_party.redirect_uris: {redirect_uris}")
 
         #2b check: # $.[response_type] is in body of the EC $.metadata.openid_relying_party[response_type]
         response_type = decoded_body.get('response_type')
-        response_types = param_manager.get_value("response_type", param_manager.saved_param)
-        test_manager.append_test(param_manager.increment_value("ARR Payload", param_manager.section), "$.response_type in $.metadata.openid_relying_party[response_type]", response_type is not None and response_type in response_types, f"The response_type in the payload of the JWT Authorization Request payload MUST be present AND in the list of the response_types provided in the Entity Configuration payload\n  $.response_type: {response_type}\n  $.metadata.openid_relying_party.response_types: {response_types}")
+        response_types = Validator.param_manager.get_value("response_type", Validator.param_manager.saved_param)
+        Validator.test_manager.append_test(Validator.param_manager.increment_value("ARR Payload", Validator.param_manager.section), "$.response_type in $.metadata.openid_relying_party[response_type]", response_type is not None and response_type in response_types, f"The response_type in the payload of the JWT Authorization Request payload MUST be present AND in the list of the response_types provided in the Entity Configuration payload\n  $.response_type: {response_type}\n  $.metadata.openid_relying_party.response_types: {response_types}")
 
         #Third Check: check kid parameter
-        test_manager.append_test(param_manager.increment_value("ARR Payload", param_manager.section), "$.kid in $.metadata.openid_relying_party.jwks.keys[kid]", kid in param_manager.saved_param, f"The kid value in the header of the jwt request MUST be the same of the kid value in the jwks of the Metadata RP")
+        Validator.test_manager.append_test(Validator.param_manager.increment_value("ARR Payload", Validator.param_manager.section), "$.kid in $.metadata.openid_relying_party.jwks.keys[kid]", kid in Validator.param_manager.saved_param, f"The kid value in the header of the jwt request MUST be the same of the kid value in the jwks of the Metadata RP")
 
         #Fourth check: expiration date must be valid
         exp = decoded_body.get('exp', 0) 
         if exp:
             exp_date = datetime.fromtimestamp(int(exp), timezone.utc)
-            test_manager.append_test(param_manager.increment_value("ARR Payload", param_manager.section), "current_time < $.exp", (time.time()<exp), f"The expiration date MUST be valid and not passed. The expiration date is: {str(exp_date)}")
+            Validator.test_manager.append_test(Validator.param_manager.increment_value("ARR Payload", Validator.param_manager.section), "current_time < $.exp", (time.time()<exp), f"The expiration date MUST be valid and not passed. The expiration date is: {str(exp_date)}")
 
         #Fifth Check: check presence and value of parameter in HTTP Message
         # a. client_id
         client_id_http = self.ar_params.get('client_id')
         #Only SPID check for the presence
         if SPID:
-            test_manager.append_test(param_manager.increment_value("AR", param_manager.section), "client_id", bool(self.ar_params.get('client_id')), "The client_id parameter MUST be present in the HTTP message of Authorization Request.")
+            Validator.test_manager.append_test(Validator.param_manager.increment_value("AR", Validator.param_manager.section), "client_id", bool(self.ar_params.get('client_id')), "The client_id parameter MUST be present in the HTTP message of Authorization Request.")
         #If exist check the value
         if bool(self.ar_params.get('client_id')) and isinstance(client_id_http, list):
             client_id_http = client_id_http[0]
-            test_manager.append_test(param_manager.increment_value("AR", param_manager.section), "client_id == $.client_id", (client_id_http==client_id_body), f"Both the client_id in the HTTP_message and in the Payload of the JWT request MUST have the same value\n  client_id: {client_id_http}\n  $.client_id: {client_id_body}")
+            Validator.test_manager.append_test(Validator.param_manager.increment_value("AR", Validator.param_manager.section), "client_id == $.client_id", (client_id_http==client_id_body), f"Both the client_id in the HTTP_message and in the Payload of the JWT request MUST have the same value\n  client_id: {client_id_http}\n  $.client_id: {client_id_body}")
             #client_id is an HTTPS URL
-            test_manager.append_test(param_manager.increment_value("AR", param_manager.section), "client_id is an HTTPS URL", self.is_https_url(client_id_http), f"The client_id in the HTTP_message MUST be an HTTPS URL\n  client_id: {client_id_http}")
+            Validator.test_manager.append_test(Validator.param_manager.increment_value("AR", Validator.param_manager.section), "client_id is an HTTPS URL", self.is_https_url(client_id_http), f"The client_id in the HTTP_message MUST be an HTTPS URL\n  client_id: {client_id_http}")
 
         # a1. client_id == $.iss
         iss_decodedBody=decoded_body.get('iss')
-        test_manager.append_test(param_manager.increment_value("AR", param_manager.section), "client_id", client_id_http==iss_decodedBody, f"The client_id in the HTTP message and $.iss parameters in the JWT request MUST be equal.\n  client_id: {client_id_http}\n  $.iss: {iss_decodedBody}")
+        Validator.test_manager.append_test(Validator.param_manager.increment_value("AR", Validator.param_manager.section), "client_id", client_id_http==iss_decodedBody, f"The client_id in the HTTP message and $.iss parameters in the JWT request MUST be equal.\n  client_id: {client_id_http}\n  $.iss: {iss_decodedBody}")
 
         # b. response_type
         response_type_http = self.ar_params.get('response_type')
         if SPID:
-            test_manager.append_test(param_manager.increment_value("AR", param_manager.section), "response_type", bool(self.ar_params.get('response_type')), f"The response_type parameter MUST be present in the HTTP message of Authorization Request.")
+            Validator.test_manager.append_test(Validator.param_manager.increment_value("AR", Validator.param_manager.section), "response_type", bool(self.ar_params.get('response_type')), f"The response_type parameter MUST be present in the HTTP message of Authorization Request.")
         if bool(self.ar_params.get('response_type')) and isinstance(response_type_http, list):
             response_type_http = response_type_http[0]
-            test_manager.append_test(param_manager.increment_value("AR", param_manager.section), "'code' in response_type", 'code' in response_type_http, f"The value of response_type in the HTTP_message MUST be 'code'\n  response_type: {response_type_http}")
+            Validator.test_manager.append_test(Validator.param_manager.increment_value("AR", Validator.param_manager.section), "'code' in response_type", 'code' in response_type_http, f"The value of response_type in the HTTP_message MUST be 'code'\n  response_type: {response_type_http}")
     
         # c. scope
         scope = self.ar_params.get('scope')
         if bool(self.ar_params.get('scope')) and isinstance(scope, list):
             scope = scope[0]
-            test_manager.append_test(param_manager.increment_value("AR", param_manager.section), "scope", 'openid' in scope, f"The scope parameter MUST contain 'openid'\n  scope: {scope}")
-            test_manager.append_test(param_manager.increment_value("ARR", param_manager.section), "scope", scope==decoded_body.get('scope'), f"The scope parameter in the HTTP message and JWT Request of Authorization Request MUST be present and have the same value")
+            Validator.test_manager.append_test(Validator.param_manager.increment_value("AR", Validator.param_manager.section), "scope", 'openid' in scope, f"The scope parameter MUST contain 'openid'\n  scope: {scope}")
+            Validator.test_manager.append_test(Validator.param_manager.increment_value("ARR", Validator.param_manager.section), "scope", scope==decoded_body.get('scope'), f"The scope parameter in the HTTP message and JWT Request of Authorization Request MUST be present and have the same value")
         else:
-            test_manager.append_test(param_manager.increment_value("AR", param_manager.section), "scope", bool(self.ar_params.get('scope')), f"The scope parameter MUST be present in the HTTP message of Authorization Request.")
+            Validator.test_manager.append_test(Validator.param_manager.increment_value("AR", Validator.param_manager.section), "scope", bool(self.ar_params.get('scope')), f"The scope parameter MUST be present in the HTTP message of Authorization Request.")
 
         # d. code_challenge
         if bool(self.ar_params.get('code_challenge')):
             code_challenge=self.ar_params['code_challenge']
             codeChallenge_decoded=decoded_body.get('code_challenge')
-            test_manager.append_test(param_manager.increment_value("AR", param_manager.section), "code_challenge==$.code_challenge", codeChallenge_decoded in code_challenge, f"The code_challenge in the HTTP message and JWT Request of Authorization Request MUST be present and have the same value.\n  code_challenge: {code_challenge}\n  $.code_challenge: {codeChallenge_decoded}")
+            Validator.test_manager.append_test(Validator.param_manager.increment_value("AR", Validator.param_manager.section), "code_challenge==$.code_challenge", codeChallenge_decoded in code_challenge, f"The code_challenge in the HTTP message and JWT Request of Authorization Request MUST be present and have the same value.\n  code_challenge: {code_challenge}\n  $.code_challenge: {codeChallenge_decoded}")
         else:
-            test_manager.append_test(param_manager.increment_value("AR", param_manager.section), "code_challenge", "FAILED", f"The code_challenge parameter MUST be present in the HTTP message of Authorization Request.")
+            Validator.test_manager.append_test(Validator.param_manager.increment_value("AR", Validator.param_manager.section), "code_challenge", "FAILED", f"The code_challenge parameter MUST be present in the HTTP message of Authorization Request.")
 
         # e. code_challenge_method
         if bool(self.ar_params.get('code_challenge_method')):
             code_challenge_method=self.ar_params['code_challenge_method']
             codeChallengeMethod_decoded=decoded_body.get('code_challenge_method')
-            test_manager.append_test(param_manager.increment_value("AR", param_manager.section), "code_challenge_method==$.code_challenge_method", codeChallengeMethod_decoded in code_challenge_method, f"The code_challenge_method in the HTTP message and JWT Request of Authorization Request MUST be present and have the same value.\n  code_challenge_method: {code_challenge_method}\n  $.code_challenge_method: {codeChallengeMethod_decoded}")
+            Validator.test_manager.append_test(Validator.param_manager.increment_value("AR", Validator.param_manager.section), "code_challenge_method==$.code_challenge_method", codeChallengeMethod_decoded in code_challenge_method, f"The code_challenge_method in the HTTP message and JWT Request of Authorization Request MUST be present and have the same value.\n  code_challenge_method: {code_challenge_method}\n  $.code_challenge_method: {codeChallengeMethod_decoded}")
         else:
-            test_manager.append_test(param_manager.increment_value("AR", param_manager.section), "code_challenge_method", bool(self.ar_params.get('code_challenge_method')), f"The code_challenge_method parameter MUST be present in the HTTP message of Authorization Request.")
+            Validator.test_manager.append_test(Validator.param_manager.increment_value("AR", Validator.param_manager.section), "code_challenge_method", bool(self.ar_params.get('code_challenge_method')), f"The code_challenge_method parameter MUST be present in the HTTP message of Authorization Request.")
    
 class JWKSValidator(Validator):
     def __init__(self):
         pass
-
+    
     def validate(self, jwks_uri_jwt: str, input_data: Dict[str, Any], msg: str) -> None:
         super().validate(jwks_uri_jwt, input_data, msg)
+
+    def additional_checks(self, decoded_body: str, kid: str):
+        # No additional checks needed for JWKSValidator
+        pass
 
 #Reset all for restart
 def reset_all():
@@ -488,8 +492,7 @@ def reset_all():
     
     url_ar = ""
     url_rp = ""
-    test_manager.reset()
-    param_manager.reset()
+    Validator.reset_managers()
 
 #Method to select all related files (if SPID) from folder
 def select_files(is_spid):
@@ -504,9 +507,33 @@ def select_files(is_spid):
     else:
         return [f for f in all_files if '_SPID' not in f]
 
-def init(url_rp, url_ar, schemas):
+#Method to load schemas
+def load_schemas(is_spid):
+    file_names = select_files(is_spid)
+
+    schemas = {}
+    for file_name in file_names:
+        try:
+            with open(os.path.join(INPUT_SCHEMA, file_name), 'r') as schema_file:
+                schema_key = file_name.split('.')[0].replace("_SPID", "") + '_schema'
+                schemas[schema_key] = json.load(schema_file)
+        except FileNotFoundError:
+            console.print(f"[ERROR] {file_name} not found in {INPUT_SCHEMA}.", style="bold red")
+        except json.JSONDecodeError:
+            console.print(f"[ERROR] {file_name} is not a valid JSON file.", style="bold red")
+        except Exception as e:
+            console.print(f"[ERROR] An unexpected error occurred: {str(e)}", style="bold red")
+    return schemas
+
+#Init
+def init(url_rp, url_ar):
+    #Load schemas
+    schemas = load_schemas(is_spid)
+
+    global SPID
     if is_spid:
         console.log(f"\nSPID Test on: {url_rp}", style = "bold magenta")
+        SPID = True
     else:
         console.log(f"\nCIE Test on: {url_rp}", style = "bold magenta")
     
@@ -530,8 +557,8 @@ def init(url_rp, url_ar, schemas):
             response = requests.get(url_ec, allow_redirects=True)
         except Exception as e:
             console.print(f"[ERROR] Downloading has failed: {str(e)}", style="bold red")
-            test_manager.update_test("1", "Test Result", "[ERROR]")
-            test_manager.update_test("1", "Reason/Mitigation", "The URL MUST support .well-known/openid-federation")
+            Validator.test_manager.update_test("1", "Test Result", "[ERROR]")
+            Validator.test_manager.update_test("1", "Reason/Mitigation", "The URL MUST support .well-known/openid-federation")
             pass
         ec_end_time = time.time()
         ec_time = ec_end_time - ec_start_time
@@ -540,21 +567,21 @@ def init(url_rp, url_ar, schemas):
         if response:
             #Check the method used
             method = response.request.method
-            test_manager.append_test(param_manager.increment_value("EC", param_manager.section), "Method GET", "GET" == method, "The response MUST be a GET")
+            Validator.test_manager.append_test(Validator.param_manager.increment_value("EC", Validator.param_manager.section), "Method GET", "GET" == method, "The response MUST be a GET")
 
             #Check the status code
             status_code = response.status_code
-            test_manager.append_test(param_manager.increment_value("EC", param_manager.section), "Status code", "200" == str(status_code), f"The response MUST return HTTP Status Code 200. Actual is {status_code}")
+            Validator.test_manager.append_test(Validator.param_manager.increment_value("EC", Validator.param_manager.section), "Status code", "200" == str(status_code), f"The response MUST return HTTP Status Code 200. Actual is {status_code}")
 
             #Check headers of HTTP
             content = response.headers.get('Content-Type')
             content = content.split(";", 1)[0]
             if bool(content):
-                test_manager.append_test(param_manager.increment_value("EC", param_manager.section), "Content-Type", content == "application/entity-statement+jwt", f"Content-Type MUST be a string valued as 'application/entity-statement+jwt'. The value in the message is {content}")
+                Validator.test_manager.append_test(Validator.param_manager.increment_value("EC", Validator.param_manager.section), "Content-Type", content == "application/entity-statement+jwt", f"Content-Type MUST be a string valued as 'application/entity-statement+jwt'. The value in the message is {content}")
             else:
-                test_manager.append_test(param_manager.increment_value("EC", param_manager.section), "Content-Type", bool(content), "Content-Type MUST be present")
+                Validator.test_manager.append_test(Validator.param_manager.increment_value("EC", Validator.param_manager.section), "Content-Type", bool(content), "Content-Type MUST be present")
 
-            test_manager.append_test(param_manager.increment_value("EC", param_manager.section), "Return the Entity Configuration Metadata", bool(response), f"The URL at .well.known/openid-federation MUST contain a JWT")
+            Validator.test_manager.append_test(Validator.param_manager.increment_value("EC", Validator.param_manager.section), "Return the Entity Configuration Metadata", bool(response), f"The URL at .well.known/openid-federation MUST contain a JWT")
 
             #Check if return a document
             jwt_input = (response.content).decode('ascii')
@@ -565,21 +592,21 @@ def init(url_rp, url_ar, schemas):
             trust_marks = (validator.get_decoded_body()).get('trust_marks')
 
             #Add the section for different trust_marks
-            section_TM = param_manager.get_value("EC Payload", param_manager.section)
+            section_TM = Validator.param_manager.get_value("EC Payload", Validator.param_manager.section)
 
             if trust_marks:
                 for i, trust_mark_obj in enumerate(trust_marks, 1):
-                    param_manager.add_value(f"TM{i}", section_TM + f".{i}", param_manager.section)
+                    Validator.param_manager.add_value(f"TM{i}", section_TM + f".{i}", Validator.param_manager.section)
                     
                     #Print the main line for Trust Mark #{i}
-                    test_manager.append_test(section_TM, f"JWT Trust Mark: #{i}", "[PASSED]", "")
+                    Validator.test_manager.append_test(section_TM, f"JWT Trust Mark: #{i}", "[PASSED]", "")
 
                     trust_mark_jwt = trust_mark_obj.get('trust_mark')
 
                     validator = TMValidator(i)
                     validator.validate(trust_mark_jwt, schemas, f"TM{i}")
             else:
-                test_manager.append_test(section_TM, f"JWT Trust Mark", "[FAILED]", "The Trust Mark MUST be present.")
+                Validator.test_manager.append_test(section_TM, f"JWT Trust Mark", "[FAILED]", "The Trust Mark MUST be present.")
             
             if is_spid:
                 signed_jwks_uri = (validator.get_decoded_body())['metadata']['openid_relying_party'].get('signed_jwks_uri')
@@ -598,8 +625,8 @@ def init(url_rp, url_ar, schemas):
                         validator.validate(jose_input, schemas, "JWKS")
 
     else:
-        test_manager.update_test("1", "Test Result", "[SKIPPED]")
-        test_manager.update_test("1", "Reason/Mitigation", "URL not provided")
+        Validator.test_manager.update_test("1", "Test Result", "[SKIPPED]")
+        Validator.test_manager.update_test("1", "Reason/Mitigation", "URL not provided")
 
     #Analyzing AR
     if url_ar:
@@ -622,24 +649,20 @@ def init(url_rp, url_ar, schemas):
             jwt_input = ar_params.get('request')
             
             #Create entry for request JWT and add the result
-            param_manager.add_value("ARR", param_manager.get_value("AR", param_manager.section)+".1", param_manager.section)                
-            test_manager.append_test(param_manager.increment_value("AR", param_manager.section), "request (JWT)", bool(jwt_input), "The request parameter MUST be present in the HTTP message of Authorization Request.")
+            Validator.param_manager.add_value("ARR", Validator.param_manager.get_value("AR", Validator.param_manager.section)+".1", Validator.param_manager.section)                
+            Validator.test_manager.append_test(Validator.param_manager.increment_value("AR", Validator.param_manager.section), "request (JWT)", bool(jwt_input), "The request parameter MUST be present in the HTTP message of Authorization Request.")
 
             validator = ARValidator(ar_params)
             validator.validate(jwt_input, schemas, "ARR")
     else:
-        test_manager.update_test("2", "Reason/Mitigation", "URL not provided")
-        test_manager.update_test("2", "Test Result", "[SKIPPED]")
+        Validator.test_manager.update_test("2", "Reason/Mitigation", "URL not provided")
+        Validator.test_manager.update_test("2", "Test Result", "[SKIPPED]")
     
-    test_manager.update_parent_test(test_manager.simple_output)
+    Validator.test_manager.update_parent_test(Validator.test_manager.simple_output)
 
-    main(test_manager.simple_output, VERBOSE, url_rp)
+    main(Validator.test_manager.simple_output, VERBOSE, url_rp)
 
 if __name__ == "__main__":
-    #Initialize classes
-    param_manager = ParamManager()
-    test_manager = TestManager()
-    
     #Include the parser
     parser = argparse.ArgumentParser(description="Tool for processing URLs given the URL to the Relying Party Metadata (url_rp) and the Authorization Request")
 
@@ -660,22 +683,6 @@ if __name__ == "__main__":
     inputFile = args.filename
     if args.verbose:
         VERBOSE = True
-    
-    #Load schemas
-    file_names = select_files(is_spid)
-
-    schemas = {}
-    for file_name in file_names:
-        try:
-            with open(os.path.join(INPUT_SCHEMA, file_name), 'r') as schema_file:
-                schema_key = file_name.split('.')[0].replace("_SPID", "") + '_schema'
-                schemas[schema_key] = json.load(schema_file)
-        except FileNotFoundError:
-            console.print(f"[ERROR] {file_name} not found in {INPUT_SCHEMA}.", style="bold red")
-        except json.JSONDecodeError:
-            console.print(f"[ERROR] {file_name} is not a valid JSON file.", style="bold red")
-        except Exception as e:
-            console.print(f"[ERROR] An unexpected error occurred: {str(e)}", style="bold red")
 
     #Enter required missing arguments
     if inputFile is None:
@@ -683,7 +690,8 @@ if __name__ == "__main__":
             url_rp = input("Enter the URL of the Relying Party: ")
         if url_ar is None:
             url_ar = input("Enter the URL to obtain the Authorization Request: ")
-        init(url_rp, url_ar, schemas)
+        init(url_rp, url_ar)
+    #If File as input
     else:
         try:
             with open (inputFile, 'r') as input_file:
@@ -697,7 +705,7 @@ if __name__ == "__main__":
                     if index % 2 == 0:
                         url_ar = line.strip()
                         #When both the URLs analyze them
-                        init(url_rp,url_ar,schemas)
+                        init(url_rp,url_ar)
                         #Continue
                         reset_all()
                     #Odd line
