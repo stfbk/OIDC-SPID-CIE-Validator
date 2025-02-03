@@ -82,13 +82,13 @@ class TestManager:
         for test in reversed(self.simple_output):
             parent_id = '.'.join(test["ID"].split('.')[:-1])
             parent = next((t for t in self.simple_output if t["ID"] == parent_id), None)
-            
+
             # Only process if this is a subsection (has more than 1 part)
             if parent:
                 #If any subsection failed and parent has not already FAILED, mark parent as FAILED and ADD
                 if test["Test Result"] in ["FAILED", "[FAILED]"] and not (parent["Test Result"] in ["FAILED", "[FAILED]"] and parent["Reason/Mitigation"]):
                     self.update_test(parent_id, "Test Result", "[FAILED]")
-                    self.update_test(parent_id, "Reason/Mitigation", f"Some of the subtests failed. See subsequent, e.g., {test['ID']}.")
+                    self.update_test(parent_id, "Reason/Mitigation", f"Some of the subtests failed. See subsequent, e.g., {test['ID']}")
                 #If parent has no result, check if all subsections are passed
                 elif parent["Test Result"] in ["FAILED", "[FAILED]", "PASSED", ""]:
                     siblings = [t for t in self.simple_output if t["ID"].startswith(parent_id + '.')]
@@ -123,7 +123,7 @@ class ParamManager:
         if key in param_dict:
             param_dict[key] = value
         else:
-            console.print(f"[ERROR] Key '{key}' does not exist in the dictionary. Cannot update.", style="bold red")
+            console.print(f"[WARNING] Key '{key}' does not exist in the dictionary. Cannot update.", style="bold red")
     
     #Method to increment the value into a specified dictionary add 1 to last char
     @staticmethod
@@ -140,9 +140,9 @@ class ParamManager:
                 param_dict[key] = new_value
                 return current_value
             except ValueError:
-                console.print(f"[ERROR] Invalid version format for '{key}' in {param_dict}.", style="bold red")
+                console.print(f"[WARNING] Invalid version format for '{key}' in {param_dict}.", style="bold red")
         else:
-            console.print(f"[ERROR] Key '{key}' does not exist in the dictionary. Cannot update.", style="bold red")
+            console.print(f"[WARNING] Key '{key}' does not exist in the dictionary. Cannot update.", style="bold red")
 
     #Method to add a new key-value pair to a specified dictionary
     @staticmethod
@@ -225,7 +225,7 @@ class Validator(ABC):
                 Validator.test_manager.append_test(main_id, "JWT " + which_schema, "[PASSED]", "")
 
         except Exception as e:
-            console.print(f"[ERROR] Unexpected error during schema validation: {str(e)}", style="bold red")
+            console.print(f"[WARNING] Unexpected error during schema validation: {str(e)}", style="bold red")
 
     @staticmethod
     def validate_signature (jwt_input: Dict[str, Any], alg: int, section: str, kid: str):
@@ -254,7 +254,7 @@ class Validator(ABC):
         except InvalidTokenError as e:
             Validator.test_manager.append_test(section, "Signature", "[FAILED]", f"Signature for JWT failed: {str(e)}")
         except Exception as e:
-            Validator.test_manager.append_test(section, "Signature", "[ERROR]", f"An unexpected error occurred: {str(e)}")
+            Validator.test_manager.append_test(section, "Signature", "[WARNING]", f"An unexpected error occurred: {str(e)}")
 
     @classmethod
     def validate_and_decode_jwt(cls, schemas:dict, jwt_input:str, msg:str):
@@ -285,24 +285,24 @@ class Validator(ABC):
                 if header_schema:
                     cls.validate_schema(decoded_header, header_schema, "Header", msg)
                 else:
-                    console.print(f"[ERROR] The {msg} header schema has not been loaded", style="bold red")
+                    console.print(f"[WARNING] The {msg} header schema has not been loaded", style="bold red")
 
                 if body_schema:
                     cls.validate_schema(decoded_body, body_schema, "Payload", msg)
                 else:
-                    console.print(f"[ERROR] The {msg} payload schema has not been loaded", style="bold red")
+                    console.print(f"[WARNING] The {msg} payload schema has not been loaded", style="bold red")
 
             except jsonschema.exceptions.ValidationError as e:
-                console.print(f"[ERROR] Schema validation error: {e.message}", style="bold red")
+                console.print(f"[WARNING] Schema validation error: {e.message}", style="bold red")
                 return False
             except jwt.exceptions.DecodeError as e:
-                console.print(f"[ERROR] JWT decoding error for {msg}: {e}", style="bold red")
+                console.print(f"[WARNING] JWT decoding error for {msg}: {e}", style="bold red")
                 return False
             
             return decoded_body, alg, kid
 
         else:
-            console.print(f"[ERROR] The downloaded {msg} content does not contain a valid JWT.", style="bold red")
+            console.print(f"[WARNING] The downloaded {msg} content does not contain a valid JWT.", style="bold red")
 
 class ECValidator(Validator):
     def __init__(self):
@@ -381,8 +381,9 @@ class TMValidator(Validator):
 
             #Third check: check iss is in auth_hints
             iss = tm_body.get('iss')
+            iss_stripped = tm_body.get('iss').rstrip('/')
             authority_hints = Validator.param_manager.get_value("authority_hints", Validator.param_manager.saved_param)
-            Validator.test_manager.append_test(Validator.param_manager.increment_value(f"TM{self.tm_number} Payload", Validator.param_manager.section), "$.iss in $.authority_hints", iss in authority_hints, f"The iss of the Trust Mark MUST be a superior entity, i.e., authority_hints in the Metadata\n iss: {iss}\n authority_hints: {authority_hints}")
+            Validator.test_manager.append_test(Validator.param_manager.increment_value(f"TM{self.tm_number} Payload", Validator.param_manager.section), "$.iss in $.authority_hints", iss_stripped in [item.rstrip('/') for item in authority_hints], f"The iss of the Trust Mark MUST be a superior entity, i.e., authority_hints in the Metadata\n iss: {iss}\n authority_hints: {authority_hints}")
 
             #Fourth check: expiration date must be valid
             exp = tm_body.get('exp', 0)
@@ -518,11 +519,11 @@ def load_schemas(is_spid):
                 schema_key = file_name.split('.')[0].replace("_SPID", "") + '_schema'
                 schemas[schema_key] = json.load(schema_file)
         except FileNotFoundError:
-            console.print(f"[ERROR] {file_name} not found in {INPUT_SCHEMA}.", style="bold red")
+            console.print(f"[WARNING] {file_name} not found in {INPUT_SCHEMA}.", style="bold red")
         except json.JSONDecodeError:
-            console.print(f"[ERROR] {file_name} is not a valid JSON file.", style="bold red")
+            console.print(f"[WARNING] {file_name} is not a valid JSON file.", style="bold red")
         except Exception as e:
-            console.print(f"[ERROR] An unexpected error occurred: {str(e)}", style="bold red")
+            console.print(f"[WARNING] An unexpected error occurred: {str(e)}", style="bold red")
     return schemas
 
 #Init
@@ -556,8 +557,8 @@ def init(url_rp, url_ar):
         try:
             response = requests.get(url_ec, allow_redirects=True)
         except Exception as e:
-            console.print(f"[ERROR] Downloading has failed: {str(e)}", style="bold red")
-            Validator.test_manager.update_test("1", "Test Result", "[ERROR]")
+            console.print(f"[WARNING] Downloading has failed: {str(e)}", style="bold red")
+            Validator.test_manager.update_test("1", "Test Result", "[WARNING]")
             Validator.test_manager.update_test("1", "Reason/Mitigation", "The URL MUST support .well-known/openid-federation")
             pass
         ec_end_time = time.time()
@@ -614,7 +615,7 @@ def init(url_rp, url_ar):
                     try:
                         response = requests.get(signed_jwks_uri, allow_redirects=True)
                     except Exception as e:
-                        console.print(f"[ERROR] Downloading has failed: {str(e)}", style="bold red")
+                        console.print(f"[WARNING] Downloading has failed: {str(e)}", style="bold red")
                         pass
                 
                     if response:
@@ -639,7 +640,7 @@ def init(url_rp, url_ar):
                 url_ar = resp.url
             ar_params = urllib.parse.parse_qs(urlparse(url_ar).query)
         except Exception as e:
-            console.print(f"[ERROR] The provided URL is not valid: {str(e)}", style="bold red")
+            console.print(f"[WARNING] The provided URL is not valid: {str(e)}", style="bold red")
         
         ar_end_time = time.time()
         ar_time = ar_end_time - ar_start_time
@@ -713,6 +714,6 @@ if __name__ == "__main__":
                         url_rp = line.strip()
                     index = index + 1
         except FileNotFoundError:
-            console.print(f"[ERROR] {inputFile} is not found.", style="bold red")
+            console.print(f"[WARNING] {inputFile} is not found.", style="bold red")
         except Exception as e:
-            console.print(f"[ERROR] An unexpected error occurred: {str(e)}", style="bold red")
+            console.print(f"[WARNING] An unexpected error occurred: {str(e)}", style="bold red")
