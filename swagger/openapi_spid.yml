@@ -196,7 +196,6 @@ paths:
                           - exp
                           - jwks
                           - metadata
-                          - authority_hints
                           - trust_marks
                         properties:
                           iss:
@@ -234,6 +233,8 @@ paths:
                               ]
                             $ref: "#/components/schemas/RP_ID_metadata"
                           authority_hints:
+                            description: {{TO VERIFY}}
+                            x-conditional-required: when not TA
                             type: array
                             items:
                               type: string
@@ -497,6 +498,18 @@ components:
               type: string
               x-conditional-required: MUST iff SA
               enum: ["full", "light"]
+            policy_uri:
+              description: {{TO VERIFY}} 
+              x-conditional-required: MUST iff AA
+            tos_uri:
+              description: {{TO VERIFY}} 
+              x-conditional-required: MUST iff AA
+            claims:
+              description: {{TO VERIFY}} 
+              x-conditional-required: MUST iff AA
+            service_documentation:
+              description: {{TO VERIFY}} 
+              x-conditional-required: MUST iff AA
         signature:
           type: string
           description: The signature section of the JWT, encoded in Base64.
@@ -594,6 +607,11 @@ components:
               x-external-information: The userinfo_signed_response_alg in must be the one defined in the entity statement.
               not:
                 enum: ["none", "HS256", "HS384", "HS512"]
+            id_token_encrypted_response_enc:
+              description: {{TO VERIFY}}
+              x-conditional-required: if there is id_token_encrypted_response_alg
+            id_token_encrypted_response_alg:
+              description: {{TO VERIFY}}
             userinfo_encrypted_response_alg:
               description: "MUST be one between the defined in the entity statement"
               type: string
