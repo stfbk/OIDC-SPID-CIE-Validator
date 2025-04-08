@@ -273,6 +273,7 @@ components:
           required:
             - alg
             - kid
+            - typ
           properties:
             alg:
               type: string
@@ -285,6 +286,11 @@ components:
               type: string
               description: Indicate which key should be used to verify the token's signature.
               example: 1b94c
+            typ:
+              type: string
+              description: Type of the token, usually "JWT".
+              example: JWT
+              enum: ["entity-statement+jwt"]
         payload:
           type: object
           description: Payload section of the JWT containing federation claims
@@ -304,7 +310,6 @@ components:
             - iat
             - iss
             - aud
-            - ui_locales
           properties:
             client_id:
               description: Uniquely identifies RP
@@ -424,9 +429,7 @@ components:
             - sub
             - id
             - iat
-            - logo_uri
             - exp
-            - ref
             - organization_type
             - id_code
             - email
@@ -451,6 +454,7 @@ components:
               format: int64
               x-comparison-parameter: $./.well-known/openid-federation.metadata.trust_marks.trust_mark.iat < $./.well-known/openid-federation.metadata.trust_marks.trust_mark.exp
             log_uri:
+              description: {{TO VERIFY}} 
               type: string
               format: uri
               pattern: '^https:\/\/[a-zA-Z0-9.-]+(\/[a-zA-Z0-9._-]+)*\.svg'
@@ -459,12 +463,14 @@ components:
               format: int64
               description: Expiration time of the JWT as a Unix timestamp.
             ref:
+              description: {{TO VERIFY}}
               type: string
               format: uri
             organization_type:
               type: string
               enum: ["public", "private"]
             id_code:
+              description: {{TO VERIFY}}
               type: object
               properties:
                 ipa_code:
@@ -481,9 +487,11 @@ components:
                   type: string
                   x-conditional-required: MUST if $./.well-known/openid-federation.metadata.trust_marks.trust_mark.organization_type==private AND !$./.well-known/openid-federation.metadata.trust_marks.trust_mark.id_code.vat_number
             email:
+              description: {{TO VERIFY}}
               type: string
               format: email
             organization_name:
+              description: {{TO VERIFY}}
               type: string
             sa_profile:
               type: string
