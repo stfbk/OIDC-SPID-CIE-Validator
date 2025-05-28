@@ -123,7 +123,7 @@ paths:
                 code_challenge_method:
                   x-external-information: The code_challenge_method in must be in the code_challenge_methods_supported of the OP metadata.
                 request:
-                  description: The jwt MUST follow the JWTRequest schema
+                  description: The JWT MUST follow the JWTRequest schema
                   type: string
                   pattern: '[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+\/=]*'
                   $ref: "#/components/schemas/JWTRequest"
@@ -232,6 +232,8 @@ paths:
                               ]
                             $ref: "#/components/schemas/RP_ID_metadata"
                           authority_hints:
+                            description: {{TO VERIFY}}
+                            x-conditional-required: when not TA
                             type: array
                             items:
                               type: string
@@ -271,6 +273,7 @@ components:
           required:
             - alg
             - kid
+            - typ
           properties:
             alg:
               type: string
@@ -426,13 +429,8 @@ components:
             - sub
             - id
             - iat
-            - logo_uri
             - exp
-            - ref
             - organization_type
-            - id_code
-            - email
-            - organization_name
           properties:
             iss:
               type: string
@@ -452,8 +450,9 @@ components:
               type: integer
               format: int64
               x-comparison-parameter: $./.well-known/openid-federation.metadata.trust_marks.trust_mark.iat < $./.well-known/openid-federation.metadata.trust_marks.trust_mark.exp
-            log_uri:
+            logo_uri:
               type: string
+              decription: {{TO VERIFY}}
               format: uri
               pattern: '^https:\/\/[a-zA-Z0-9.-]+(\/[a-zA-Z0-9._-]+)*\.svg'
             exp:
@@ -462,11 +461,13 @@ components:
               description: Expiration time of the JWT as a Unix timestamp.
             ref:
               type: string
+              decription: {{TO VERIFY}}
               format: uri
             organization_type:
               type: string
               enum: ["public", "private"]
             id_code:
+              decription: {{TO VERIFY}}
               type: object
               properties:
                 ipa_code:
@@ -483,14 +484,28 @@ components:
                   type: string
                   x-conditional-required: MUST if $./.well-known/openid-federation.metadata.trust_marks.trust_mark.organization_type==private AND !$./.well-known/openid-federation.metadata.trust_marks.trust_mark.id_code.vat_number
             email:
+              decription: {{TO VERIFY}}
               type: string
               format: email
             organization_name:
+              decription: {{TO VERIFY}}
               type: string
             sa_profile:
               type: string
               x-conditional-required: MUST iff SA
               enum: ["full", "light"]
+            policy_uri:
+              description: {{TO VERIFY}} 
+              x-conditional-required: MUST iff AA
+            tos_uri:
+              description: {{TO VERIFY}} 
+              x-conditional-required: MUST iff AA
+            claims:
+              description: {{TO VERIFY}} 
+              x-conditional-required: MUST iff AA
+            service_documentation:
+              description: {{TO VERIFY}} 
+              x-conditional-required: MUST iff AA
         signature:
           type: string
           description: The signature section of the JWT, encoded in Base64.

@@ -234,6 +234,8 @@ paths:
                               ]
                             $ref: "#/components/schemas/RP_ID_metadata"
                           authority_hints:
+                            description: {{TO VERIFY}}
+                            x-conditional-required: when not TA
                             type: array
                             items:
                               type: string
@@ -428,9 +430,7 @@ components:
             - sub
             - id
             - iat
-            - logo_uri
             - exp
-            - ref
             - organization_type
             - id_code
             - email
@@ -454,7 +454,8 @@ components:
               type: integer
               format: int64
               x-comparison-parameter: $./.well-known/openid-federation.metadata.trust_marks.trust_mark.iat < $./.well-known/openid-federation.metadata.trust_marks.trust_mark.exp
-            log_uri:
+            logo_uri:
+              description: {{TO VERIFY}} 
               type: string
               format: uri
               pattern: '^https:\/\/[a-zA-Z0-9.-]+(\/[a-zA-Z0-9._-]+)*\.svg'
@@ -463,12 +464,14 @@ components:
               format: int64
               description: Expiration time of the JWT as a Unix timestamp.
             ref:
+              description: {{TO VERIFY}}
               type: string
               format: uri
             organization_type:
               type: string
               enum: ["public", "private"]
             id_code:
+              description: {{TO VERIFY}}
               type: object
               properties:
                 ipa_code:
@@ -485,14 +488,28 @@ components:
                   type: string
                   x-conditional-required: MUST if $./.well-known/openid-federation.metadata.trust_marks.trust_mark.organization_type==private AND !$./.well-known/openid-federation.metadata.trust_marks.trust_mark.id_code.vat_number
             email:
+              description: {{TO VERIFY}}
               type: string
               format: email
             organization_name:
+              description: {{TO VERIFY}}
               type: string
             sa_profile:
               type: string
               x-conditional-required: MUST iff SA
               enum: ["full", "light"]
+            policy_uri:
+              description: {{TO VERIFY}} 
+              x-conditional-required: MUST iff AA
+            tos_uri:
+              description: {{TO VERIFY}} 
+              x-conditional-required: MUST iff AA
+            claims:
+              description: {{TO VERIFY}} 
+              x-conditional-required: MUST iff AA
+            service_documentation:
+              description: {{TO VERIFY}} 
+              x-conditional-required: MUST iff AA
         signature:
           type: string
           description: The signature section of the JWT, encoded in Base64.
@@ -590,6 +607,11 @@ components:
               x-external-information: The userinfo_signed_response_alg in must be the one defined in the entity statement.
               not:
                 enum: ["none", "HS256", "HS384", "HS512"]
+            id_token_encrypted_response_enc:
+              description: {{TO VERIFY}}
+              x-conditional-required: if there is id_token_encrypted_response_alg
+            id_token_encrypted_response_alg:
+              description: {{TO VERIFY}}
             userinfo_encrypted_response_alg:
               description: "MUST be one between the defined in the entity statement"
               type: string
