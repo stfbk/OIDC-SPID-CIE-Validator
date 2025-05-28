@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: OAuth2 Authorization API
-  version: 1.0.0
+  version: 1.0.1
 
 paths:
   /authentication:
@@ -196,6 +196,7 @@ paths:
                           - exp
                           - jwks
                           - metadata
+                          - authority_hints
                           - trust_marks
                         properties:
                           iss:
@@ -274,7 +275,6 @@ components:
           required:
             - alg
             - kid
-            - typ
           properties:
             alg:
               type: string
@@ -289,9 +289,9 @@ components:
               example: 1b94c
             typ:
               type: string
-              description: Type of the token, usually "JWT".
+              description: Type of the token "JWT".
               example: JWT
-              enum: ["entity-statement+jwt"]
+              enum: ["jwt"]
         payload:
           type: object
           description: Payload section of the JWT containing federation claims
@@ -454,7 +454,7 @@ components:
               type: integer
               format: int64
               x-comparison-parameter: $./.well-known/openid-federation.metadata.trust_marks.trust_mark.iat < $./.well-known/openid-federation.metadata.trust_marks.trust_mark.exp
-            log_uri:
+            logo_uri:
               description: {{TO VERIFY}} 
               type: string
               format: uri

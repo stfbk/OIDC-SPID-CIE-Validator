@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: OAuth2 Authorization API
-  version: 1.0.0
+  version: 1.0.1
 
 paths:
   /authentication:
@@ -194,6 +194,7 @@ paths:
                           - exp
                           - jwks
                           - metadata
+                          - authority_hints
                           - trust_marks
                         properties:
                           iss:
@@ -287,9 +288,9 @@ components:
               example: 1b94c
             typ:
               type: string
-              description: Type of the token, usually "JWT".
+              description: Type of the token "JWT".
               example: JWT
-              enum: ["entity-statement+jwt"]
+              enum: ["jwt"]
         payload:
           type: object
           description: Payload section of the JWT containing federation claims
@@ -449,7 +450,7 @@ components:
               type: integer
               format: int64
               x-comparison-parameter: $./.well-known/openid-federation.metadata.trust_marks.trust_mark.iat < $./.well-known/openid-federation.metadata.trust_marks.trust_mark.exp
-            log_uri:
+            logo_uri:
               type: string
               decription: {{TO VERIFY}}
               format: uri
@@ -612,11 +613,6 @@ components:
               x-external-information: The userinfo_encrypted_response_alg in must be the one defined in the entity statement.
               not:
                 enum: ["RS_1_5"]
-            id_token_encrypted_response_enc:
-              description: {{TO VERIFY}}
-              x-conditional-required: if there is id_token_encrypted_response_alg
-            id_token_encrypted_response_alg:
-              description: {{TO VERIFY}}
             userinfo_encrypted_response_enc:
               description: "MUST be one between the defined in the entity statement"
               type: string
