@@ -108,8 +108,7 @@ class ParamManager:
             "response_type": "",
             "exp_date": "",
             "authority_hints": "",
-            "iss": "",
-            "kid_defaultRSASign":""
+            "iss": ""
         }
     
     #Method to get value by key from a specified dictionary
@@ -160,8 +159,6 @@ class ParamManager:
                         binary_key = key.as_pem(is_private=False)
                         #Save kid and key
                         self.add_value(k["kid"], binary_key.decode('utf-8'), self.saved_param)
-                        #Update defaultRSA
-                        self.update_value("kid_defaultRSASign", k["kid"], self.saved_param)
 
 #Class that provides methods for validating various data formats, .g., schema, signature
 class Validator(ABC):
@@ -229,8 +226,6 @@ class Validator(ABC):
 
     @staticmethod
     def validate_signature (jwt_input: Dict[str, Any], alg: int, section: str, kid: str):
-        if kid == "defaultRSASign":
-            kid="kid_defaultRSASign"
         kid = Validator.param_manager.get_value(kid, Validator.param_manager.saved_param)
         
         if not kid:
@@ -257,6 +252,18 @@ class Validator(ABC):
             Validator.test_manager.append_test(section, "Signature", "[WARNING]", f"An unexpected error occurred: {str(e)}")
 
     @classmethod
+    def decode_jwt(cls, jwt_input: str):
+        try:     
+            #Decode header and body of the JWT without verifying the signature
+            decoded_body = jwt.decode(jwt_input.replace('\n',''), options={"verify_signature": False})
+            decoded_header = jwt.get_unverified_header(jwt_input.replace('\n',''))
+        except jwt.exceptions.DecodeError as e:
+            console.print(f"[WARNING] JWT decoding error: {e}", style="bold red")
+            return False, False
+
+        return decoded_body, decoded_header
+
+    @classmethod
     def validate_and_decode_jwt(cls, schemas:dict, jwt_input:str, msg:str):
         #Add Header and Payload
         cls.param_manager.add_value(msg+" Header", cls.param_manager.increment_value(msg, cls.param_manager.section)+".1", cls.param_manager.section)
@@ -266,6 +273,9 @@ class Validator(ABC):
         cls.test_manager.append_test(cls.param_manager.increment_value(msg, cls.param_manager.section), "Valid JWT", cls.is_jwt(jwt_input), f"It MUST be a valid JWT")
 
         if cls.is_jwt (jwt_input):
+            alg = ""
+            kid = ""
+
             #For TM there is the number only on the message but not on the schema
             entity = msg[:-1] if "TM" in msg else msg
 
@@ -273,31 +283,27 @@ class Validator(ABC):
             header_schema = schemas.get(entity+'_header_schema')
             body_schema = schemas.get(entity+'_body_schema')
 
-            try:
-                #Decode header and body of the JWT without verifying the signature
-                decoded_body = jwt.decode(jwt_input.replace('\n',''), options={"verify_signature": False})
-                decoded_header = jwt.get_unverified_header(jwt_input.replace('\n',''))
-                
-                #Save alg and kid for future usage
-                alg = decoded_header.get('alg', "")
-                kid = decoded_header.get('kid', "")
+            decoded_body, decoded_header = cls.decode_jwt(jwt_input)
 
-                if header_schema:
-                    cls.validate_schema(decoded_header, header_schema, "Header", msg)
-                else:
-                    console.print(f"[WARNING] The {msg} header schema has not been loaded", style="bold red")
+            if decoded_body or decoded_header:
+                try:
+                    #Save alg and kid for future usage
+                    alg = decoded_header.get('alg', "")
+                    kid = decoded_header.get('kid', "")
 
-                if body_schema:
-                    cls.validate_schema(decoded_body, body_schema, "Payload", msg)
-                else:
-                    console.print(f"[WARNING] The {msg} payload schema has not been loaded", style="bold red")
+                    if header_schema:
+                        cls.validate_schema(decoded_header, header_schema, "Header", msg)
+                    else:
+                        console.print(f"[WARNING] The {msg} header schema has not been loaded", style="bold red")
 
-            except jsonschema.exceptions.ValidationError as e:
-                console.print(f"[WARNING] Schema validation error: {e.message}", style="bold red")
-                return False
-            except jwt.exceptions.DecodeError as e:
-                console.print(f"[WARNING] JWT decoding error for {msg}: {e}", style="bold red")
-                return False
+                    if body_schema:
+                        cls.validate_schema(decoded_body, body_schema, "Payload", msg)
+                    else:
+                        console.print(f"[WARNING] The {msg} payload schema has not been loaded", style="bold red")
+
+                except jsonschema.exceptions.ValidationError as e:
+                    console.print(f"[WARNING] Schema validation error: {e.message}", style="bold red")
+                    return False
             
             return decoded_body, alg, kid
 
@@ -372,6 +378,18 @@ class TMValidator(Validator):
         super().validate(trust_mark_jwt, input_data, msg)
 
     def additional_checks(self, tm_body: list, kid:str):
+            #Call for iss entity configuration to retrieve signature
+            iss_stripped = tm_body.get('iss').rstrip('/')
+
+            response, jwt_input = url_requests(iss_stripped, True)
+
+            #Decode JWT and save key
+            if response:
+                decoded_body, decoded_header = super().decode_jwt(jwt_input)
+
+                keys = decoded_body.get('jwks', {}).get('keys', [])
+                Validator.param_manager.save_kid(keys)
+
             #First check: $.[sub]==url_rp
             sub = tm_body.get('sub')
             Validator.test_manager.append_test(Validator.param_manager.increment_value(f"TM{self.tm_number} Payload", Validator.param_manager.section), "$.sub == URL_RP", sub==url_rp, f"The subject in the Trust Mark MUST be present and have the same value of URL Relying Party\n  sub: {sub}\n  url_rp: {url_rp}")
@@ -381,7 +399,6 @@ class TMValidator(Validator):
 
             #Third check: check iss is in auth_hints
             iss = tm_body.get('iss')
-            iss_stripped = tm_body.get('iss').rstrip('/')
             authority_hints = Validator.param_manager.get_value("authority_hints", Validator.param_manager.saved_param)
             Validator.test_manager.append_test(Validator.param_manager.increment_value(f"TM{self.tm_number} Payload", Validator.param_manager.section), "$.iss in $.authority_hints", iss_stripped in [item.rstrip('/') for item in authority_hints], f"The iss of the Trust Mark MUST be a superior entity, i.e., authority_hints in the Metadata\n iss: {iss}\n authority_hints: {authority_hints}")
 
@@ -526,6 +543,35 @@ def load_schemas(is_spid):
             console.print(f"[WARNING] An unexpected error occurred: {str(e)}", style="bold red")
     return schemas
 
+#Method to get responses
+def url_requests(url:str, fed:bool):
+    param = False
+
+    if fed:
+        if FEDERATION_URL not in url_rp:
+            #If not present add a trailing slash and the FEDERATION ENDPOINT
+            url = url + ('/' if not url.endswith('/') else '')
+            final_url = url+FEDERATION_URL
+        else:
+            #If FEDERATION ENDPOINT is present with the trailing slash remove the trailing
+            url = url.rstrip('/')
+            final_url = url
+    
+    try:
+        response = requests.get(final_url, allow_redirects=True)
+    except Exception as e:
+        console.print(f"[WARNING] The provided URL is not valid: {str(e)}", style="bold red")
+        return False
+    
+    if fed:
+        param = response.content.decode('ascii')
+    else:
+        for resp in response.history:
+            url_ar = resp.url
+        param = urllib.parse.parse_qs(urlparse(url_ar).query)
+    
+    return response, param
+
 #Init
 def init(url_rp, url_ar):
     #Load schemas
@@ -543,24 +589,7 @@ def init(url_rp, url_ar):
     #Analyzing EC
     if url_rp:
         ec_start_time = time.time()
-        response = False
-        
-        if FEDERATION_URL not in url_rp:
-            #If not present add a trailing slash and the FEDERATION ENDPOINT
-            url_rp = url_rp + ('/' if not url_rp.endswith('/') else '')
-            url_ec = url_rp+FEDERATION_URL
-        else:
-            #If FEDERATION ENDPOINT is present with t trailing slash remove the trailing
-            url_rp = url_rp.rstrip('/')
-            url_ec = url_rp
-
-        try:
-            response = requests.get(url_ec, allow_redirects=True)
-        except Exception as e:
-            console.print(f"[WARNING] Downloading has failed: {str(e)}", style="bold red")
-            Validator.test_manager.update_test("1", "Test Result", "[WARNING]")
-            Validator.test_manager.update_test("1", "Reason/Mitigation", "The URL MUST support .well-known/openid-federation")
-            pass
+        response, jwt_input = url_requests(url_rp, True)
         ec_end_time = time.time()
         ec_time = ec_end_time - ec_start_time
         print(f"Downloading EC time: {ec_time:.2f} seconds")
@@ -583,9 +612,6 @@ def init(url_rp, url_ar):
                 Validator.test_manager.append_test(Validator.param_manager.increment_value("EC", Validator.param_manager.section), "Content-Type", bool(content), "Content-Type MUST be present")
 
             Validator.test_manager.append_test(Validator.param_manager.increment_value("EC", Validator.param_manager.section), "Return the Entity Configuration Metadata", bool(response), f"The URL at .well.known/openid-federation MUST contain a JWT")
-
-            #Check if return a document
-            jwt_input = (response.content).decode('ascii')
 
             validator = ECValidator()
             validator.validate(jwt_input, schemas, "EC")
@@ -624,7 +650,9 @@ def init(url_rp, url_ar):
 
                         validator = JWKSValidator()
                         validator.validate(jose_input, schemas, "JWKS")
-
+        else:
+            Validator.test_manager.update_test("1", "Test Result", "[WARNING]")
+            Validator.test_manager.update_test("1", "Reason/Mitigation", "The URL MUST support .well-known/openid-federation")
     else:
         Validator.test_manager.update_test("1", "Test Result", "[SKIPPED]")
         Validator.test_manager.update_test("1", "Reason/Mitigation", "URL not provided")
@@ -632,16 +660,7 @@ def init(url_rp, url_ar):
     #Analyzing AR
     if url_ar:
         ar_start_time = time.time()
-        ar_params = False
-        
-        try:
-            response_ar = requests.get(url_ar)
-            for resp in response_ar.history:
-                url_ar = resp.url
-            ar_params = urllib.parse.parse_qs(urlparse(url_ar).query)
-        except Exception as e:
-            console.print(f"[WARNING] The provided URL is not valid: {str(e)}", style="bold red")
-        
+        response_ar, ar_params = url_requests(url_ar, False)
         ar_end_time = time.time()
         ar_time = ar_end_time - ar_start_time
         print(f"Downloading AR time: {ar_time:.2f} seconds")

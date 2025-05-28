@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: OAuth2 Authorization API
-  version: 1.0.0
+  version: 1.0.1
 
 paths:
   /authentication:
@@ -283,6 +283,11 @@ components:
               type: string
               description: Indicate which key should be used to verify the token's signature.
               example: 1b94c
+            typ:
+              type: string
+              description: Type of the token "JWT".
+              example: JWT
+              enum: ["jwt"]
         payload:
           type: object
           description: Payload section of the JWT containing federation claims
@@ -302,7 +307,6 @@ components:
             - iat
             - iss
             - aud
-            - ui_locales
           properties:
             client_id:
               description: Uniquely identifies RP
