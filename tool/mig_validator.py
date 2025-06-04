@@ -491,7 +491,44 @@ class ARValidator(Validator):
             Validator.test_manager.append_test(Validator.param_manager.increment_value("AR", Validator.param_manager.section), "code_challenge_method==$.code_challenge_method", codeChallengeMethod_decoded in code_challenge_method, f"The code_challenge_method in the HTTP message and JWT Request of Authorization Request MUST be present and have the same value.\n  code_challenge_method: {code_challenge_method}\n  $.code_challenge_method: {codeChallengeMethod_decoded}")
         else:
             Validator.test_manager.append_test(Validator.param_manager.increment_value("AR", Validator.param_manager.section), "code_challenge_method", bool(self.ar_params.get('code_challenge_method')), f"The code_challenge_method parameter MUST be present in the HTTP message of Authorization Request.")
+
+        ARValidator.op_comparison(self, decoded_body)
    
+    def op_comparison(self, decoded_body: str):
+        ec = False
+        #Check aud by calling its EC.
+        aud = decoded_body.get('aud')
+        list_aud = [aud] if isinstance(aud, str) else aud
+
+        for el_aud in list_aud:
+            response, jwt_input = url_requests(el_aud, True)
+            #If there is no response there is a warning on that url but no wrong message
+            if response:
+                ec = True
+                new_body, decoded_header = super().decode_jwt(jwt_input)
+
+                #Check iss
+                iss = new_body.get('iss')
+                Validator.test_manager.append_test(Validator.param_manager.increment_value("AR", Validator.param_manager.section), "$.aud == $.metadata.iss", (iss==el_aud), f"Both the aud in the Payload of the JWT request and the iss in its Entity Configuration MUST have the same value\n  $.metadata.iss: {iss}\n  $.aud: {aud}")
+                
+                #Check acr_values
+                acr_values = decoded_body.get('acr_values')
+                acr_values_supported = new_body.get('metadata').get('openid_provider').get('acr_values_supported')
+                Validator.test_manager.append_test(Validator.param_manager.increment_value("AR", Validator.param_manager.section), "$.acr_values in $.metadata.openid_provider.acr_values_supported", (acr_values in acr_values_supported), f"The acr_values in the Payload of the JWT request MUST be contained in the acr_values_supported in the OPs Entity Configuration\n:  $.metadata.openid_provider.acr_values_supported: {acr_values_supported}\n  $.acr_values: {acr_values}")
+
+                #Check scope
+                scope = decoded_body.get('scope')
+                scopes_supported = new_body.get('metadata').get('openid_provider').get('scopes_supported')
+                print("QUI: ",scope, scopes_supported)
+                print(scope in scopes_supported)
+                Validator.test_manager.append_test(Validator.param_manager.increment_value("AR", Validator.param_manager.section), "$.scope in $.metadata.openid_provider.scopes_supported", (scope in scopes_supported), f"The scope in the Payload of the JWT request MUST be contained in the scopes_supported in the OPs Entity Configuration\n:  $.metadata.openid_provider.scopes_supported: {scopes_supported}\n  $.scope: {scope}")
+    
+        #If there is no response something is wrong
+        if not ec:
+            Validator.test_manager.append_test("AR", "Reason/Mitigation", "The 'aud' in JWT request MUST support .well-known/openid-federation")
+        
+        return
+
 class JWKSValidator(Validator):
     def __init__(self):
         pass
@@ -543,32 +580,32 @@ def load_schemas(is_spid):
             console.print(f"[WARNING] An unexpected error occurred: {str(e)}", style="bold red")
     return schemas
 
-#Method to get responses
+#Method to get responses. Return response, , and param, the decoded body
 def url_requests(url:str, fed:bool):
     param = False
 
     if fed:
         if FEDERATION_URL not in url_rp:
             #If not present add a trailing slash and the FEDERATION ENDPOINT
-            url = url + ('/' if not url.endswith('/') else '')
-            final_url = url+FEDERATION_URL
+            old_url = url + ('/' if not url.endswith('/') else '')
+            url = old_url+FEDERATION_URL
         else:
             #If FEDERATION ENDPOINT is present with the trailing slash remove the trailing
-            url = url.rstrip('/')
-            final_url = url
+            old_url = url.rstrip('/')
+            url = old_url
     
     try:
-        response = requests.get(final_url, allow_redirects=True)
+        response = requests.get(url, allow_redirects=True)
     except Exception as e:
         console.print(f"[WARNING] The provided URL is not valid: {str(e)}", style="bold red")
-        return False
-    
+        return False, False
+
     if fed:
         param = response.content.decode('ascii')
     else:
         for resp in response.history:
-            url_ar = resp.url
-        param = urllib.parse.parse_qs(urlparse(url_ar).query)
+            url = resp.url
+        param = urllib.parse.parse_qs(urlparse(url).query)
     
     return response, param
 
@@ -585,7 +622,7 @@ def init(url_rp, url_ar):
         console.log(f"\nCIE Test on: {url_rp}", style = "bold magenta")
     
     jwt_input=""
-
+    
     #Analyzing EC
     if url_rp:
         ec_start_time = time.time()
