@@ -148,22 +148,30 @@ class ParamManager:
     def add_value(key:str, value: Any, param_dict: Dict[str, Any]):
         param_dict[key] = value
     
-    #Method to save the kid value
-    def save_kid(self, keys: List[Dict[str, Any]]):
+    #Method to convert the keys as pem in binary utf-8
+    def convert_keys(keys: List[Dict[str, Any]]):
         if keys:
             for k in keys:
-                if k.get("use")=="sig" or not bool(k.get("use")):
-                    if k.get("kid") not in self.saved_param and bool(k.get("kid")):
-                        #Create key
-                        key = JsonWebKey.import_key(k)
-                        binary_key = key.as_pem(is_private=False)
-                        #Save kid and key
-                        self.add_value(k["kid"], binary_key.decode('utf-8'), self.saved_param)
+                #Create key
+                key = JsonWebKey.import_key(k)
+                binary_key = key.as_pem(is_private=False).decode('utf-8')
+                k['n'] = binary_key
+        return keys
+
+    #Method to save the kid value
+    def save_kid(self, keys: List[Dict[str, Any]]):
+        converted_keys = ParamManager.convert_keys(keys)
+        #Save kid and key
+        for ck in converted_keys:
+            if ck.get('use')=="sig" or not bool(ck.get('use')):
+                if ck.get('kid') not in self.saved_param and bool(ck.get('kid')):
+                    self.add_value(ck.get('kid'), ck.get('n'), self.saved_param)
 
 #Class that provides methods for validating various data formats, .g., schema, signature
 class Validator(ABC):
     test_manager = TestManager()
     param_manager = ParamManager()
+    schemas = None
 
     def __init__(self):
         pass
@@ -180,7 +188,8 @@ class Validator(ABC):
                 jwt_input = jwt_input[0]
             self.decoded_body, self.alg, self.kid = Validator.validate_and_decode_jwt(input_data, jwt_input, msg)
             self.additional_checks(self.decoded_body, self.kid)
-            Validator.validate_signature(jwt_input, self.alg, Validator.param_manager.get_value(msg, Validator.param_manager.section), self.kid)
+            result, response = Validator.from_saved_kid_validate_signature(jwt_input, self.alg, self.kid)
+            Validator.test_manager.append_test(Validator.param_manager.get_value(msg, Validator.param_manager.section), "Signature", result, response)
 
     @abstractmethod
     def additional_checks(decoded_body: str, kid: str):
@@ -195,47 +204,72 @@ class Validator(ABC):
         return urllib.parse.urlparse(url).scheme == "https"
     
     @staticmethod
-    def validate_schema (part:dict, schema:dict, which_schema:str, msg:str):
-        #part = {'kid': 'E6BBD2AF6E03374BC8BF51E48C40C39C90177AED', 'typ': 'entity-statement+jwt', 'alg': 'RS256'}
-        msg = msg + " " + which_schema
-        main_id = ".".join(Validator.param_manager.get_value(msg, Validator.param_manager.section).split(".")[:-1])
-
+    def validate_schema (part:dict, schema:dict)-> List[Dict]:
+        """
+        Validates a JSON Web Token component against a schema.
+        
+        Args:
+            part: Dictionary containing the JWT component to validate
+            schema: Dictionary containing the validation schema
+        
+        Returns:
+            List of dictionaries containing error information
+            Bool if any error printed on console
+        """
         try:
             validator = Draft202012Validator(schema)
-            errors = sorted(validator.iter_errors(part), key=lambda e: e.path)
-
-            if errors:
-                #which_schema dice se header o payload, msg dice se EC, AR o TM{i}
-                Validator.test_manager.append_test(main_id, "JWT "+ which_schema, "[FAILED]", "")
-
-                for i, error in enumerate(errors, 1):
-                    # Format the error path (handle nested paths)
-                    path_error = ".".join(str(p) for p in error.path) or ""
-                    if path_error:
-                        Validator.test_manager.append_test(Validator.param_manager.increment_value(msg, Validator.param_manager.section), "$."+path_error, "FAILED", error.message)
-                    else:
-                        keyitem, message = Validator.test_manager.change_error_message(error.message)
-                        Validator.test_manager.append_test(Validator.param_manager.increment_value(msg, Validator.param_manager.section), "$."+keyitem , "FAILED", message)
-                
-            else:
-                #No error, for sure the main ID, e.g, Header, Payload, Signature
-                Validator.test_manager.append_test(main_id, "JWT " + which_schema, "[PASSED]", "")
+            return sorted(validator.iter_errors(part), key=lambda e: e.path)
 
         except Exception as e:
             console.print(f"[WARNING] Unexpected error during schema validation: {str(e)}", style="bold red")
+            return False
 
     @staticmethod
-    def validate_signature (jwt_input: Dict[str, Any], alg: int, section: str, kid: str):
-        kid = Validator.param_manager.get_value(kid, Validator.param_manager.saved_param)
+    def report_errors(errors, which_schema:str, msg:str):
+        """
+        Reports validation errors to the test manager system, logging each error with its location and details.
         
-        if not kid:
-            Validator.test_manager.append_test(section, "Signature", "[MISSING]", "The PUBLIC_KEY is missing, missing kid. Cannot perform the check")
-            return
+        Args:
+            errors: List of error dictionaries containing validation results
+            which_schema: String indicating which part ("Header", "Payload")
+            msg: Message identifier for parameter management (EC, AR or TM{i})
+        """
+        # Construct the main identifier
+        msg = msg + " " + which_schema
+        main_id = ".".join(Validator.param_manager.get_value(msg, Validator.param_manager.section).split(".")[:-1])
+        
+        if errors:
+            # Handle validation errors
+            Validator.test_manager.append_test(main_id, "JWT "+ which_schema, "[FAILED]", "")
+
+            for i, error in enumerate(errors, 1):
+                # Format the error path (handle nested paths)
+                path_error = ".".join(str(p) for p in error.path) or ""
+
+                if path_error:
+                    Validator.test_manager.append_test(Validator.param_manager.increment_value(msg, Validator.param_manager.section), "$."+path_error, "FAILED", error.message)
+                else:
+                    keyitem, message = Validator.test_manager.change_error_message(error.message)
+                    Validator.test_manager.append_test(Validator.param_manager.increment_value(msg, Validator.param_manager.section), "$."+keyitem , "FAILED", message)
+            
+        else:
+            #No error, for sure the main ID, e.g, Header, Payload, Signature
+            Validator.test_manager.append_test(main_id, "JWT " + which_schema, "[PASSED]", "")
+
+    @staticmethod
+    def from_saved_kid_validate_signature (jwt_input: Dict[str, Any], alg: int, kid: str)->str:
+        kid = Validator.param_manager.get_value(kid, Validator.param_manager.saved_param)
 
         if not url_rp:
-            Validator.test_manager.append_test(section, "Signature", "[MISSING]", "The PUBLIC_KEY is missing, missing URL. Cannot perform the check")
-            return
+            return "[MISSING]", "The PUBLIC_KEY is missing, missing URL. Cannot perform the check"
         
+        return Validator.validate_signature(jwt_input, alg, kid)
+    
+    @staticmethod
+    def validate_signature(jwt_input: Dict[str, Any], alg: int, kid: str)->str:
+
+        if not kid:
+            return "[MISSING]", "The PUBLIC_KEY is missing, missing kid. Cannot perform the check"
         try:
             # Decode and validate the JWT
             decoded_payload = jwt.decode(
@@ -245,11 +279,11 @@ class Validator(ABC):
                 options={"verify_aud": False, "verify_exp": False},
                 leeway=300 #5minutes
             )
-            Validator.test_manager.append_test(section, "Signature", "[PASSED]", "The signature for JWT is valid and correct.")
+            return "[PASSED]", "The signature for JWT is valid and correct."
         except InvalidTokenError as e:
-            Validator.test_manager.append_test(section, "Signature", "[FAILED]", f"Signature for JWT failed: {str(e)}")
+            return "[FAILED]", f"Signature for JWT failed: {str(e)}"
         except Exception as e:
-            Validator.test_manager.append_test(section, "Signature", "[WARNING]", f"An unexpected error occurred: {str(e)}")
+            return "[WARNING]", f"An unexpected error occurred: {str(e)}"
 
     @classmethod
     def decode_jwt(cls, jwt_input: str):
@@ -292,12 +326,16 @@ class Validator(ABC):
                     kid = decoded_header.get('kid', "")
 
                     if header_schema:
-                        cls.validate_schema(decoded_header, header_schema, "Header", msg)
+                        errors = cls.validate_schema(decoded_header, header_schema)
+                        if not isinstance(errors, bool):
+                            cls.report_errors(errors, "Header", msg)
                     else:
                         console.print(f"[WARNING] The {msg} header schema has not been loaded", style="bold red")
 
                     if body_schema:
-                        cls.validate_schema(decoded_body, body_schema, "Payload", msg)
+                        errors = cls.validate_schema(decoded_body, body_schema)
+                        if not isinstance(errors, bool):
+                            cls.report_errors(errors, "Payload", msg)
                     else:
                         console.print(f"[WARNING] The {msg} payload schema has not been loaded", style="bold red")
 
@@ -312,6 +350,7 @@ class Validator(ABC):
 
 class ECValidator(Validator):
     def __init__(self):
+        super().__init__()
         self.decoded_body = None
     
     def get_decoded_body(self):
@@ -368,7 +407,97 @@ class ECValidator(Validator):
             Validator.param_manager.update_value("response_type", decoded_body['metadata']['openid_relying_party'].get('response_types', []), Validator.param_manager.saved_param)
 
         # f. $.authority_hints
-        Validator.param_manager.update_value("authority_hints", decoded_body.get('authority_hints', {}), Validator.param_manager.saved_param)              
+        authority_hints = decoded_body.get('authority_hints', {})
+        Validator.param_manager.update_value("authority_hints", authority_hints, Validator.param_manager.saved_param)
+        # iss of trustmark
+        tm_iss = decoded_body.get('trust_marks')[0].get('iss')
+        result = self.validation_authority_hints(authority_hints, iss, tm_iss)
+        if isinstance(result, bool):
+            Validator.test_manager.append_test(Validator.param_manager.increment_value("EC Payload", Validator.param_manager.section), "Valid Trust Chain", result, "The trust chain from authority_hints has been validated.")
+        else:
+            Validator.test_manager.append_test(Validator.param_manager.increment_value("EC Payload", Validator.param_manager.section), "Valid Trust Chain from authority_hints", False, result)
+
+    def validation_authority_hints(self, authority_hints, iss, tm_iss)->str:
+        last_auth = len(authority_hints)-1
+        #For each ES[j] in auth_hints
+        for i, e in enumerate(authority_hints):
+            response, jwt_input = url_requests(e, True)
+
+            if response:
+                decoded_body, decoded_header = Validator.decode_jwt(jwt_input)
+
+                #Verify that the statement contains all the required claims
+                # header
+                head_errors = Validator.validate_schema(decoded_header, self.schemas.get('EC_header_schema'))
+                if head_errors:
+                    return f'The header of {e} is incorrect.'
+                
+                # body
+                if not (decoded_body.get('trust_marks') and decoded_body.get('authority_hints')):
+                    #check schema of TA
+                    body_errors = Validator.validate_schema(decoded_body, self.schemas.get('TA_body_schema'))
+                    if body_errors:
+                        return f'The body of {e} is incorrect.'
+                else:
+                    #check schema of EC
+                    body_errors = Validator.validate_schema(decoded_body, self.schemas.get('EC_body_schema'))
+                    if body_errors:
+                        return f'The body of {e} is incorrect.'
+
+                iat = decoded_body.get('iat')
+                exp = decoded_body.get('exp')
+                if iat and exp:
+                    exp_date = datetime.fromtimestamp(int(exp), timezone.utc)
+                    iat_date = datetime.fromtimestamp(int(iat), timezone.utc)
+                    #Verify that iat has a value in the past.
+                    if (iat>time.time()):
+                        return f"The issuance date, {str(iat_date)}, MUST be earlier than the actual date, {time.time()}."
+                    #Verify that exp has a value that is in the future.
+                    if (exp<time.time()):
+                        return f"The expiration, {str(exp_date)}, date MUST be valid and not passed, {time.time()}."
+                
+                #For each j = 0,...,i-1                
+                if i != last_auth:
+                    #verify that ES[j]["iss"] == ES[j+1]["sub"].
+                    sub = decoded_body.get('sub')
+                    if iss != sub:
+                        return "Trust chain NOT validated, iss != sub in authority_hints."
+                    iss = sub
+                    #verify that the signature of ES[j] validates with a public key in ES[j+1]["jwks"].
+                    if i == 0:
+                        old_header = decoded_header
+                        old_jwt_input = jwt_input
+                    else:
+                        validate = ECValidator.internal_validation(decoded_body, old_header, old_jwt_input)
+                        if not validate:
+                            return validate
+                        old_header = decoded_header
+                        old_jwt_input = jwt_input
+
+                #For ES[i] (the Trust Anchor's Entity Configuration) check in TM
+                if i == last_auth:
+                    #verify that the issuer matches the Entity Identifier of the Trust Anchor
+                    iss = decoded_body.get('iss')
+                    if iss != tm_iss:
+                        return "Trust chain NOT validated, the issuer does not match the Entity Identifier of the Trust Anchor."
+                    return ECValidator.internal_validation(decoded_body, decoded_header, jwt_input)
+                    
+                return True
+
+            return f'Cannot contact {e}.'
+
+    def internal_validation(decoded_body, decoded_header, jwt_input):
+        #verify that its signature validates with a public key of the Trust Anchor
+        converted_keys = ParamManager.convert_keys(decoded_body.get('jwks', {}).get('keys', []))
+        # - select the key with corresponding kid
+        for ck in converted_keys:
+            if decoded_header.get('kid') == ck.get('kid'):
+                message, response = Validator.validate_signature(jwt_input, decoded_header.get('alg'), ck.get('n'))
+            
+        if not message or message != ('[PASSED]'):
+                return f"Trust chain NOT validated, the Trust Anchor does not valid its signature. {response}"
+            
+        return True
 
 class TMValidator(Validator):
     def __init__(self, tm_number):
@@ -379,9 +508,8 @@ class TMValidator(Validator):
 
     def additional_checks(self, tm_body: list, kid:str):
             #Call for iss entity configuration to retrieve signature
-            iss_stripped = tm_body.get('iss').rstrip('/')
-
-            response, jwt_input = url_requests(iss_stripped, True)
+            iss = tm_body.get('iss')
+            response, jwt_input = url_requests(iss, True)
 
             #Decode JWT and save key
             if response:
@@ -400,7 +528,7 @@ class TMValidator(Validator):
             #Third check: check iss is in auth_hints
             iss = tm_body.get('iss')
             authority_hints = Validator.param_manager.get_value("authority_hints", Validator.param_manager.saved_param)
-            Validator.test_manager.append_test(Validator.param_manager.increment_value(f"TM{self.tm_number} Payload", Validator.param_manager.section), "$.iss in $.authority_hints", iss_stripped in [item.rstrip('/') for item in authority_hints], f"The iss of the Trust Mark MUST be a superior entity, i.e., authority_hints in the Metadata\n iss: {iss}\n authority_hints: {authority_hints}")
+            Validator.test_manager.append_test(Validator.param_manager.increment_value(f"TM{self.tm_number} Payload", Validator.param_manager.section), "$.iss in $.authority_hints", iss in [item.rstrip('/') for item in authority_hints], f"The iss of the Trust Mark MUST be a superior entity, i.e., authority_hints in the Metadata\n iss: {iss}\n authority_hints: {authority_hints}")
 
             #Fourth check: expiration date must be valid
             exp = tm_body.get('exp', 0)
@@ -580,13 +708,13 @@ def load_schemas(is_spid):
             console.print(f"[WARNING] An unexpected error occurred: {str(e)}", style="bold red")
     return schemas
 
-#Method to get responses. Return response, , and param, the decoded body
+#Method to get responses. Return response, boolean, and param, the decoded body
 def url_requests(url:str, fed:bool):
     param = False
 
     if fed:
         if FEDERATION_URL not in url_rp:
-            #If not present add a trailing slash and the FEDERATION ENDPOINT
+            #If not present add the trailing slash then add the FEDERATION ENDPOINT
             old_url = url + ('/' if not url.endswith('/') else '')
             url = old_url+FEDERATION_URL
         else:
@@ -613,6 +741,7 @@ def url_requests(url:str, fed:bool):
 def init(url_rp, url_ar):
     #Load schemas
     schemas = load_schemas(is_spid)
+    Validator.schemas = schemas
 
     global SPID
     if is_spid:
