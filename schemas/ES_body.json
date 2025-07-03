@@ -1,0 +1,93 @@
+{
+  "type": "object",
+  "properties": {
+    "iss": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://"
+    },
+    "sub": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://"
+    },
+    "iat": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "exp": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "jwks": {
+      "type": "object",
+      "properties": {
+        "keys": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "kty": {
+                "type": "string"
+              },
+              "n": {
+                "type": "string"
+              },
+              "e": {
+                "type": "string"
+              },
+              "kid": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kty",
+              "kid"
+            ]
+          }
+        }
+      },
+      "required": [
+        "keys"
+      ],
+      "additionalProperties": false
+    },
+    "metadata_policy": {
+      "type": "object"
+    },
+    "trust_marks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https://"
+          },
+          "trust_mark": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9-_]+\\.[A-Za-z0-9-_]+\\.[A-Za-z0-9-_]+$"
+          }
+        },
+        "required": [
+          "id",
+          "trust_mark"
+        ]
+      }
+    },
+    "constraints": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "iss",
+    "sub",
+    "iat",
+    "exp",
+    "jwks",
+    "metadata_policy",
+    "trust_marks",
+    "constraints"
+  ]
+}
