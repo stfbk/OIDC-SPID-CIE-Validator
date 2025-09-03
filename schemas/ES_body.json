@@ -23,7 +23,6 @@
       "type": "object",
       "properties": {
         "keys": {
-          "type": "array",
           "items": {
             "type": "object",
             "properties": {
@@ -44,7 +43,8 @@
               "kty",
               "kid"
             ]
-          }
+          },
+          "type": "array"
         }
       },
       "required": [

@@ -364,6 +364,7 @@ class ECValidator(Validator):
         #First check: $.[iss]==$.[sub]
         iss = decoded_body.get('iss', "")
         sub = decoded_body.get('sub', "")
+        SUB_EC = sub
         if iss and sub:
             Validator.test_manager.append_test(Validator.param_manager.increment_value("EC Payload", Validator.param_manager.section), "$.iss == $.sub", iss==sub, f"Both issuer and subject value in Entity Configuration JWT MUST be present and have the same value\n  iss: {iss}\n  sub: {sub}")
         # save iss
@@ -520,7 +521,7 @@ class TMValidator(Validator):
 
             #First check: $.[sub]==url_rp
             sub = tm_body.get('sub')
-            Validator.test_manager.append_test(Validator.param_manager.increment_value(f"TM{self.tm_number} Payload", Validator.param_manager.section), "$.sub == URL_RP", sub==url_rp, f"The subject in the Trust Mark MUST be present and have the same value of URL Relying Party\n  sub: {sub}\n  url_rp: {url_rp}")
+            Validator.test_manager.append_test(Validator.param_manager.increment_value(f"TM{self.tm_number} Payload", Validator.param_manager.section), "$.sub == EC.sub", sub==SUB_EC, f"The subject in the Trust Mark MUST be present and have the same value of URL Relying Party\n  sub: {sub}\n  EC.sub: {SUB_EC}")
 
             #Second check: check kid parameter
             Validator.test_manager.append_test(Validator.param_manager.increment_value(f"TM{self.tm_number} Payload", Validator.param_manager.section), "$.kid in $.metadata.openid_relying_party.jwks.keys[kid]", kid in Validator.param_manager.saved_param, f"The kid value in the header of the jwt of the Trust Mark MUST be the same of the kid value in the jwks of the Metadata RP.")
@@ -869,6 +870,8 @@ if __name__ == "__main__":
     inputFile = args.filename
     if args.verbose:
         VERBOSE = True
+
+    SUB_EC = ''
 
     #Enter required missing arguments
     if inputFile is None:
