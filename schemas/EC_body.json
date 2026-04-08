@@ -199,7 +199,7 @@
             "client_registration_types",
             "response_types"
           ],
-          "dependencies": {
+          "dependentRequired": {
             "id_token_encrypted_response_alg": [
               "id_token_encrypted_response_enc"
             ]

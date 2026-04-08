@@ -1,0 +1,1091 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "OAuth2 Authorization API - cie",
+    "version": "1.0.1"
+  },
+  "paths": {
+    "/authentication": {
+      "get": {
+        "summary": "Authentication Endpoint",
+        "description": "Initiates the OAuth2 Authentication flow.\n",
+        "parameters": [
+          {
+            "name": "client_id",
+            "in": "query",
+            "required": false,
+            "description": "Client identifier issued to the application making the request.",
+            "schema": {
+              "type": "string",
+              "format": "uri",
+              "pattern": "^https://",
+              "x-comparison-parameter": "$./authentication.client_id == $./authentication.request.client_id"
+            }
+          },
+          {
+            "name": "response_type",
+            "in": "query",
+            "required": false,
+            "description": "Type of authorization response (e.g., \"code\" for Authorization Code flow).",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "code"
+              ],
+              "x-external-information": "The response_type must be in the response_types_supported of the OP metadata."
+            }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "required": true,
+            "description": "Space-separated list of scopes.",
+            "schema": {
+              "type": "string",
+              "x-external-information": "The scope in must be in the scopes_supported of the OP metadata.",
+              "x-comparison-value": "openid in $./authentication.scope"
+            }
+          },
+          {
+            "name": "code_challenge",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "code_challenge_method",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "x-external-information": "The code_challenge_method in must be in the code_challenge_methods_supported of the OP metadata."
+            }
+          },
+          {
+            "name": "request",
+            "in": "query",
+            "required": true,
+            "description": "The jwt MUST follow the JWTRequest schema",
+            "x-signature": true,
+            "schema": {
+              "type": "string",
+              "pattern": "[A-Za-z0-9-_=]+\\.[A-Za-z0-9-_=]+\\.?[A-Za-z0-9-_.+\\/=]*",
+              "$ref": "#/components/schemas/JWTRequest"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirects to the `redirect_uri` with authorization parameters.",
+            "headers": {
+              "Location": {
+                "description": "The URL to which the user is redirected, including query parameters such as `code` or `error`.",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "format": "uri"
+                }
+              },
+              "Content-Type": {
+                "description": "Must be app",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/x-www-form-urlencoded": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "The authorization code to be exchanged for an access token (only present if `response_type=code`)."
+                    },
+                    "state": {
+                      "type": "string",
+                      "description": "The `state` parameter if provided in the request."
+                    },
+                    "error": {
+                      "type": "string",
+                      "description": "Error code if authorization fails (e.g., `access_denied`, `invalid_request`)."
+                    },
+                    "error_description": {
+                      "type": "string",
+                      "description": "Description of the error if authorization fails."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Authorization request using POST",
+        "description": "Sends an authorization request with JWT as a form parameter.\nThe JWT contains parameters like `iss`, `sub`, and `aud`.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "scope",
+                  "code_challenge",
+                  "code_challenge_method",
+                  "request"
+                ],
+                "properties": {
+                  "client_id": {
+                    "description": "Client identifier issued to the application making the request.",
+                    "type": "string",
+                    "format": "uri",
+                    "pattern": "^https://",
+                    "x-comparison-parameter": "$./authentication.client_id == $./authentication.request.client_id"
+                  },
+                  "response_type": {
+                    "description": "Type of authorization response (e.g., \"code\" for Authorization Code flow).",
+                    "type": "string",
+                    "enum": [
+                      "code"
+                    ],
+                    "x-external-information": "The response_type in must be in the response_types_supported of the OP metadata."
+                  },
+                  "scope": {
+                    "description": "Space-separated list of scopes.",
+                    "type": "string",
+                    "x-external-information": "The scope in must be in the scopes_supported of the OP metadata.",
+                    "x-comparison-value": "openid in $./authentication.scope"
+                  },
+                  "code_challenge": {
+                    "type": "string"
+                  },
+                  "code_challenge_method": {
+                    "x-external-information": "The code_challenge_method in must be in the code_challenge_methods_supported of the OP metadata."
+                  },
+                  "request": {
+                    "description": "The JWT MUST follow the JWTRequest schema",
+                    "type": "string",
+                    "pattern": "[A-Za-z0-9-_=]+\\.[A-Za-z0-9-_=]+\\.?[A-Za-z0-9-_.+\\/=]*",
+                    "$ref": "#/components/schemas/JWTRequest",
+                    "x-signature": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful authorization response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          }
+        }
+      }
+    },
+    "/RP/.well-known/openid-federation": {
+      "get": {
+        "summary": "Retrieve OpenID Connect Federation Metadata",
+        "description": "This endpoint provides metadata for the OpenID Connect Federation, containing information such as supported algorithms, federation entity ID, and other configuration details.\n",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful response with OpenID Federation metadata",
+            "content": {
+              "application/entity-statement+jwt": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "jwt"
+                  ],
+                  "properties": {
+                    "jwt": {
+                      "type": "object",
+                      "description": "JWT containing federation metadata",
+                      "required": [
+                        "header",
+                        "payload"
+                      ],
+                      "properties": {
+                        "header": {
+                          "type": "object",
+                          "description": "Header section of the JWT",
+                          "required": [
+                            "alg",
+                            "typ",
+                            "kid"
+                          ],
+                          "properties": {
+                            "alg": {
+                              "type": "string",
+                              "description": "Algorithm used to sign the JWT (e.g., RS256, ES256).",
+                              "example": "RS256",
+                              "x-external-information": "The alg value must be one of the supported from the OP.",
+                              "not": {
+                                "enum": [
+                                  "none",
+                                  "HS256",
+                                  "HS384",
+                                  "HS512"
+                                ]
+                              }
+                            },
+                            "typ": {
+                              "type": "string",
+                              "description": "Type of the token, usually \"JWT\".",
+                              "example": "JWT",
+                              "enum": [
+                                "entity-statement+jwt"
+                              ]
+                            },
+                            "kid": {
+                              "type": "string",
+                              "description": "Key ID hint used to select the public key to verify the JWT.",
+                              "example": "1b94c"
+                            }
+                          }
+                        },
+                        "payload": {
+                          "type": "object",
+                          "description": "Payload section of the JWT containing federation claims",
+                          "required": [
+                            "iss",
+                            "sub",
+                            "iat",
+                            "exp",
+                            "jwks",
+                            "metadata",
+                            "authority_hints",
+                            "trust_marks"
+                          ],
+                          "properties": {
+                            "iss": {
+                              "type": "string",
+                              "format": "uri",
+                              "pattern": "^https://[^?#]+$",
+                              "description": "Issuer identifier for the federation.",
+                              "x-comparison-parameter": "$./.well-known/openid-federation.iss==$./.well-known/openid-federation.sub"
+                            },
+                            "sub": {
+                              "type": "string",
+                              "description": "Subject identifier for the federation entity.",
+                              "pattern": "^https://[^?#]+$",
+                              "x-comparison-parameter": "$./.well-known/openid-federation.sub==$./authentication.client_id"
+                            },
+                            "iat": {
+                              "type": "integer",
+                              "format": "int64",
+                              "x-comparison-parameter": "$./.well-known/openid-federation.iat < $./.well-known/openid-federation.exp"
+                            },
+                            "exp": {
+                              "type": "integer",
+                              "format": "int64",
+                              "description": "Expiration time of the JWT as a Unix timestamp."
+                            },
+                            "jwks": {
+                              "type": "object",
+                              "pattern": "\"keys\"\\s*:\\s*\\[\\s*(\\{\\s*\"kty\"\\s*:\\s*\".+?\"\\s*,\\s*\"kid\"\\s*:\\s*\".+?\"\\s*(,\\s*\".+?\"\\s*:\\s*\".+?\"\\s*)*\\}\\s*,\\s*)*(\\{\\s*\"kty\"\\s*:\\s*\".+?\"\\s*,\\s*\"kid\"\\s*:\\s*\".+?\"\\s*(,\\s*\".+?\"\\s*:\\s*\".+?\"\\s*)*\\})\\s*\\]"
+                            },
+                            "metadata": {
+                              "type": "object",
+                              "description": "The metadata MUST follow the RP_ID_metadata schema",
+                              "enum": [
+                                "openid_relying_party",
+                                "openid_provider",
+                                "federation_entity",
+                                "oauth_authorization_server",
+                                "oauth_resource"
+                              ],
+                              "$ref": "#/components/schemas/RP_ID_metadata"
+                            },
+                            "authority_hints": {
+                              "description": {
+                                "": null
+                              },
+                              "x-conditional-required": "when not TA",
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "format": "uri",
+                                "pattern": "^https://[^?#]+$"
+                              }
+                            },
+                            "trust_marks": {
+                              "type": "array",
+                              "items": {
+                                "description": "The JWT must follow the TrustMarks schema",
+                                "$ref": "#/components/schemas/TrustMarks",
+                                "type": "object",
+                                "enum": [
+                                  "id",
+                                  "trust_mark"
+                                ],
+                                "x-signature": true
+                              }
+                            }
+                          },
+                          "x-requirements": {
+                            "description": "`iss` must be equal to `sub`.\n"
+                          }
+                        },
+                        "signature": {
+                          "type": "string",
+                          "description": "The signature section of the JWT, encoded in Base64.",
+                          "example": "sQ5c3G...lZG8="
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found - if the `.well-known` endpoint is unavailable"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "JWTRequest": {
+        "type": "object",
+        "required": [
+          "header",
+          "payload",
+          "signature"
+        ],
+        "properties": {
+          "header": {
+            "type": "object",
+            "description": "Header section of the JWT",
+            "required": [
+              "alg",
+              "kid",
+              "typ"
+            ],
+            "properties": {
+              "alg": {
+                "type": "string",
+                "description": "Algorithm used to sign the JWT (e.g., RS256, ES256).",
+                "example": "RS256",
+                "x-external-information": "The alg value must be one of the supported from the OP metadata.",
+                "not": {
+                  "enum": [
+                    "none",
+                    "HS256",
+                    "HS384",
+                    "HS512"
+                  ]
+                }
+              },
+              "kid": {
+                "type": "string",
+                "description": "Indicate which key should be used to verify the token's signature.",
+                "example": "1b94c"
+              },
+              "typ": {
+                "type": "string",
+                "description": "Type of the token \"JWT\".",
+                "example": "JWT",
+                "enum": [
+                  "jwt"
+                ]
+              }
+            }
+          },
+          "payload": {
+            "type": "object",
+            "description": "Payload section of the JWT containing federation claims",
+            "required": [
+              "client_id",
+              "code_challenge",
+              "code_challenge_method",
+              "nonce",
+              "prompt",
+              "redirect_uri",
+              "response_type",
+              "scope",
+              "acr_values",
+              "claims",
+              "state",
+              "exp",
+              "iat",
+              "iss",
+              "aud"
+            ],
+            "properties": {
+              "client_id": {
+                "description": "Uniquely identifies RP",
+                "type": "string",
+                "format": "uri",
+                "pattern": "^https://[^?#]+$"
+              },
+              "code_challenge": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9._~-]{43,128}$",
+                "x-comparison-parameter": "$./authentication.code_challenge == $./authentication.request.code_challenge"
+              },
+              "code_challenge_method": {
+                "type": "string",
+                "enum": [
+                  "plain",
+                  "RS256"
+                ],
+                "x-comparison-parameter": "$./authentication.code_challenge_method == $./authentication.request.code_challenge_method"
+              },
+              "nonce": {
+                "type": "string",
+                "pattern": "^[ -~]{32,}$"
+              },
+              "prompt": {
+                "type": "string",
+                "enum": [
+                  "consent",
+                  "consent login"
+                ]
+              },
+              "redirect_uri": {
+                "type": "string",
+                "format": "uri",
+                "pattern": "^https://[^?#]+$",
+                "x-comparison-parameter": "$./authentication.request.redirect_uri in $./RP/.well-known/openid-federation.metadata.openid_relying_party.redirect_uris"
+              },
+              "response_type": {
+                "type": "string",
+                "enum": [
+                  "code"
+                ],
+                "x-comparison-parameter": "response_types in $./RP/.well-known/openid-federation.metadata.openid_relying_party.response_types_supported"
+              },
+              "scope": {
+                "type": "string",
+                "enum": [
+                  "openid",
+                  "openid profile",
+                  "openid email",
+                  "openid profile email"
+                ],
+                "x-comparison-parameter": "$./authentication.request.scope == $./authentication.scope"
+              },
+              "acr_values": {
+                "type": "string",
+                "format": "uri",
+                "pattern": "^(https://www\\.spid\\.gov\\.it/SpidL1|https://www\\.spid\\.gov\\.it/SpidL2|https://www\\.spid\\.gov\\.it/SpidL3)(\\s(https://www\\.spid\\.gov\\.it/SpidL1|https://www\\.spid\\.gov\\.it/SpidL2|https://www\\.spid\\.gov\\.it/SpidL3))*$",
+                "x-external-information": "The value of acr_values must be in the acr_values_supported of the OP metadata."
+              },
+              "claims": {
+                "type": "object",
+                "description": "Requested claims for the user.",
+                "properties": {
+                  "userinfo": {
+                    "$ref": "#/components/schemas/CommonClaims"
+                  },
+                  "id_token": {
+                    "$ref": "#/components/schemas/CommonClaims"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "state": {
+                "type": "string",
+                "pattern": "^[ -~]{32,}$"
+              },
+              "exp": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Expiration time of the JWT as a Unix timestamp."
+              },
+              "iat": {
+                "type": "integer",
+                "format": "int64",
+                "x-comparison-parameter": "$./authentication.request.iat < $./authentication.request.exp"
+              },
+              "iss": {
+                "type": "string",
+                "format": "uri",
+                "pattern": "^https://[^?#]+$",
+                "x-comparison-parameter": "$./authentication.request.iss == $./authentication.request.client_id"
+              },
+              "aud": {
+                "type": "string",
+                "pattern": "^https://",
+                "x-external-information": "The aud value must be equal the issuer of the OP metadata."
+              },
+              "ui_locales": {
+                "type": "string",
+                "pattern": "^([a-zA-Z]{2,3}([a-zA-Z]{4})?([a-zA-Z]{2})?)( ([a-zA-Z]{2,3}([a-zA-Z]{4})?([a-zA-Z]{2})?))*$"
+              }
+            }
+          },
+          "signature": {
+            "type": "string",
+            "description": "The signature section of the JWT, encoded in Base64.",
+            "example": "sQ5c3G...lZG8="
+          }
+        }
+      },
+      "TrustMarks": {
+        "type": "object",
+        "required": [
+          "header",
+          "payload",
+          "signature"
+        ],
+        "properties": {
+          "header": {
+            "type": "object",
+            "description": "Header section of the JWT",
+            "required": [
+              "alg",
+              "kid",
+              "typ"
+            ],
+            "properties": {
+              "alg": {
+                "type": "string",
+                "description": "Algorithm used to sign the JWT (e.g., RS256, ES256).",
+                "example": "RS256",
+                "x-external-information": "The alg value must be one of the supported from the OP metadata.",
+                "not": {
+                  "enum": [
+                    "none",
+                    "HS256",
+                    "HS384",
+                    "HS512"
+                  ]
+                }
+              },
+              "kid": {
+                "type": "string",
+                "description": "Indicate which key should be used to verify the token's signature.",
+                "example": "1b94c"
+              },
+              "typ": {
+                "type": "string",
+                "description": "Type of token",
+                "example": "JWT",
+                "enum": [
+                  "trust-mark+jwt"
+                ]
+              }
+            }
+          },
+          "payload": {
+            "type": "object",
+            "description": "Payload section of the JWT containing federation claims",
+            "required": [
+              "iss",
+              "sub",
+              "id",
+              "iat",
+              "exp",
+              "organization_type"
+            ],
+            "properties": {
+              "iss": {
+                "type": "string",
+                "format": "uri",
+                "pattern": "^https://[^?#]+$",
+                "description": "Issuer identifier for the federation.",
+                "x-comparison-parameter": "$./.well-known/openid-federation.metadata.trust_marks.trust_mark.iss==$./.well-known/openid-federation.metadata.trust_marks.trust_mark.sub"
+              },
+              "sub": {
+                "type": "string",
+                "description": "Subject identifier for the federation entity.",
+                "pattern": "^https://[^?#]+$",
+                "x-comparison-parameter": "$./.well-known/openid-federation.metadata.trust_marks.trust_mark.sub==$./authentication.client_id"
+              },
+              "id": {
+                "type": "string",
+                "pattern": "^https:\\/\\/[a-zA-Z0-9.-]+\\/(openid_relying_party|openid_provider|federation_entity|oauth_authorization_server|oauth_resource)\\/[a-zA-Z0-9._-]+\\/$"
+              },
+              "iat": {
+                "type": "integer",
+                "format": "int64",
+                "x-comparison-parameter": "$./.well-known/openid-federation.metadata.trust_marks.trust_mark.iat < $./.well-known/openid-federation.metadata.trust_marks.trust_mark.exp"
+              },
+              "logo_uri": {
+                "type": "string",
+                "decription": {
+                  "": null
+                },
+                "format": "uri",
+                "pattern": "^https:\\/\\/[a-zA-Z0-9.-]+(\\/[a-zA-Z0-9._-]+)*\\.svg"
+              },
+              "exp": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Expiration time of the JWT as a Unix timestamp."
+              },
+              "ref": {
+                "type": "string",
+                "decription": {
+                  "": null
+                },
+                "format": "uri"
+              },
+              "organization_type": {
+                "type": "string",
+                "enum": [
+                  "public",
+                  "private"
+                ]
+              },
+              "id_code": {
+                "decription": {
+                  "": null
+                },
+                "type": "object",
+                "properties": {
+                  "ipa_code": {
+                    "type": "string",
+                    "x-conditional-required": "MUST if $./.well-known/openid-federation.metadata.trust_marks.trust_mark.organization_type == \"public\""
+                  },
+                  "aoo_code": {
+                    "type": "string"
+                  },
+                  "uo_code": {
+                    "type": "string"
+                  },
+                  "vat_number": {
+                    "type": "string",
+                    "x-conditional-required": "MUST if $./.well-known/openid-federation.metadata.trust_marks.trust_mark.organization_type==private AND !$./.well-known/openid-federation.metadata.trust_marks.trust_mark.id_code.fiscal_number"
+                  },
+                  "fiscal_number": {
+                    "type": "string",
+                    "x-conditional-required": "MUST if $./.well-known/openid-federation.metadata.trust_marks.trust_mark.organization_type==private AND !$./.well-known/openid-federation.metadata.trust_marks.trust_mark.id_code.vat_number"
+                  }
+                }
+              },
+              "email": {
+                "decription": {
+                  "": null
+                },
+                "type": "string",
+                "format": "email"
+              },
+              "organization_name": {
+                "decription": {
+                  "": null
+                },
+                "type": "string"
+              },
+              "sa_profile": {
+                "type": "string",
+                "x-conditional-required": "MUST iff SA",
+                "enum": [
+                  "full",
+                  "light"
+                ]
+              },
+              "policy_uri": {
+                "description": {
+                  "": null
+                },
+                "x-conditional-required": "MUST iff AA"
+              },
+              "tos_uri": {
+                "description": {
+                  "": null
+                },
+                "x-conditional-required": "MUST iff AA"
+              },
+              "claims": {
+                "description": {
+                  "": null
+                },
+                "x-conditional-required": "MUST iff AA"
+              },
+              "service_documentation": {
+                "description": {
+                  "": null
+                },
+                "x-conditional-required": "MUST iff AA"
+              }
+            }
+          },
+          "signature": {
+            "type": "string",
+            "description": "The signature section of the JWT, encoded in Base64.",
+            "example": "sQ5c3G...lZG8="
+          }
+        }
+      },
+      "RP_ID_metadata": {
+        "type": "object",
+        "properties": {
+          "federation_entity": {
+            "required": [
+              "organization_name",
+              "homepage_uri",
+              "policy_uri",
+              "contacts",
+              "federation_resolve_endpoint"
+            ],
+            "properties": {
+              "organization_name": {
+                "type": "string"
+              },
+              "homepage_uri": {
+                "type": "string",
+                "format": "uri"
+              },
+              "policy_uri": {
+                "type": "string",
+                "format": "uri"
+              },
+              "logo_uri": {
+                "type": "string",
+                "format": "uri",
+                "pattern": "^https://.*\\\\.svg"
+              },
+              "contacts": {
+                "description": "Institutional certified email address (PEC) of the entity",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "federation_resolve_endpoint": {
+                "type": "string",
+                "format": "uri",
+                "pattern": "^https://[a-zA-Z0-9.-]+/resolve/?$"
+              }
+            }
+          },
+          "openid_relying_party": {
+            "required": [
+              "redirect_uris",
+              "grant_types",
+              "jwks",
+              "id_token_signed_response_alg",
+              "userinfo_signed_response_alg",
+              "userinfo_encrypted_response_alg",
+              "userinfo_encrypted_response_enc",
+              "token_endpoint_auth_method",
+              "client_id",
+              "client_registration_types",
+              "response_types"
+            ],
+            "properties": {
+              "redirect_uris": {
+                "description": "MUST be HTTPS for web-based client",
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "uri",
+                  "pattern": "^https://[^?#]+$",
+                  "x-comparison-parameter": "$./authentication.request.redirect_uri in $./RP/.well-known/openid-federation.metadata.openid_relying_party.redirect_uris"
+                }
+              },
+              "grant_types": {
+                "description": "The array must contain the value 'authorization_code'",
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "authorization_code",
+                    "refresh_token"
+                  ],
+                  "uniqueItems": true
+                }
+              },
+              "jwks": {
+                "type": "object",
+                "required": [
+                  "keys"
+                ],
+                "properties": {
+                  "keys": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "kty",
+                        "kid"
+                      ],
+                      "properties": {
+                        "kty": {
+                          "type": "string"
+                        },
+                        "kid": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "id_token_signed_response_alg": {
+                "description": "MUST be one between the defined in the entity statement",
+                "type": "string",
+                "x-external-information": "The id_token_signed_response_alg in must be the one defined in the entity statement."
+              },
+              "id_token_encrypted_response_alg": {
+                "description": "MUST be one between the defined in the entity statement",
+                "type": "string",
+                "x-external-information": "The id_token_encrypted_response_alg in must be the one defined in the entity statement."
+              },
+              "id_token_encrypted_response_enc": {
+                "description": "MUST be one between the defined in the entity statement",
+                "type": "string",
+                "x-external-information": "The id_token_encrypted_response_enc in must be the one defined in the entity statement.",
+                "x-conditional-required": "if id_token_encrypted_response_alg"
+              },
+              "userinfo_signed_response_alg": {
+                "description": "MUST be one between the defined in the entity statement",
+                "type": "string",
+                "x-external-information": "The userinfo_signed_response_alg in must be the one defined in the entity statement.",
+                "not": {
+                  "enum": [
+                    "none",
+                    "HS256",
+                    "HS384",
+                    "HS512"
+                  ]
+                }
+              },
+              "userinfo_encrypted_response_alg": {
+                "description": "MUST be one between the defined in the entity statement",
+                "type": "string",
+                "x-external-information": "The userinfo_encrypted_response_alg in must be the one defined in the entity statement.",
+                "not": {
+                  "enum": [
+                    "RS_1_5"
+                  ]
+                }
+              },
+              "userinfo_encrypted_response_enc": {
+                "description": "MUST be one between the defined in the entity statement",
+                "type": "string",
+                "x-external-information": "The userinfo_encrypted_response_enc in must be the one defined in the entity statement."
+              },
+              "token_endpoint_auth_method": {
+                "type": "string",
+                "enum": [
+                  "private_key_jwt"
+                ]
+              },
+              "client_id": {
+                "description": "MUST uniquely identify the RP",
+                "type": "string",
+                "pattern": "^https://[^?#]+$"
+              },
+              "client_registration_types": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "automatic"
+                  ]
+                }
+              },
+              "response_types": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "code"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "CommonClaims": {
+        "type": "object",
+        "description": "Common claims structure. The $PREFIX variable represents the namespace.",
+        "properties": {
+          "$PREFIX/spid_code": {
+            "example": "ABCD123456789A",
+            "type": "string",
+            "pattern": "^[A-Z]{4}[A-Za-z0-9]{10}$"
+          },
+          "given_name": {
+            "type": "string",
+            "description": "User's first name.",
+            "pattern": "^([A-Z][a-z]*)( [A-Z][a-z]*)*$"
+          },
+          "family_name": {
+            "type": "string",
+            "description": "User's last name.",
+            "pattern": "^([A-Z][a-z]*)( [A-Z][a-z]*)*$"
+          },
+          "place_of_birth": {
+            "type": "object",
+            "properties": {
+              "locality": {
+                "type": "string"
+              },
+              "region": {
+                "type": "string"
+              }
+            }
+          },
+          "birthdate": {
+            "type": "string",
+            "format": "date",
+            "description": "User's date of birth."
+          },
+          "gender": {
+            "type": "string",
+            "enum": [
+              "female",
+              "male"
+            ]
+          },
+          "$PREFIX/company_name": {
+            "example": "Agenzia per l'Italia Digitale",
+            "type": "string",
+            "pattern": "^([A-Z][a-z]*(?: [a-z]+)*|[A-Z]+)(?: [A-Z][a-z]*(?: [a-z]+)*| [A-Z]+)*$"
+          },
+          "$PREFIX/registered_office": {
+            "type": "object",
+            "pattern": "^(via|viale|piazza|corso|largo|strada|vicolo) [A-Za-z0-9]+(?: [A-Za-z0-9]+)* \\d+ \\d{5} [A-Za-z]+(?: [A-Za-z]+)* [A-Z]{2}$"
+          },
+          "$PREFIX/fiscal_number": {
+            "type": "string",
+            "pattern": "^TINT-[A-Za-z0-9]+$",
+            "description": "User's fiscal number."
+          },
+          "$PREFIX/company_fiscal_number": {
+            "type": "string",
+            "pattern": "^TINT-[A-Za-z0-9]+$",
+            "description": "Legal person's fiscal number."
+          },
+          "$PREFIX/vat_number": {
+            "type": "string",
+            "pattern": "^VATIT-[0-9]+$"
+          },
+          "document_details": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "cartaIdentita",
+                  "passaporto",
+                  "patenteGuida",
+                  "patenteNautica",
+                  "librettoPensione",
+                  "patentinoImpTermici",
+                  "portoArmi",
+                  "tesseraRiconoscimento"
+                ]
+              },
+              "document_number": {
+                "description": "Number of the document",
+                "type": "string"
+              },
+              "issuer": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  }
+                }
+              },
+              "date_of_issuance": {
+                "type": "string",
+                "format": "date"
+              },
+              "date_of_expiry": {
+                "type": "string",
+                "format": "date"
+              }
+            }
+          },
+          "phone_number": {
+            "type": "string",
+            "pattern": "^\\d+$"
+          },
+          "phone_number_verified": {
+            "type": "boolean"
+          },
+          "$PREFIX/landline_number": {
+            "type": "string",
+            "pattern": "^\\d+$"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "User's email address."
+          },
+          "email_verified": {
+            "type": "boolean",
+            "description": "Indicates whether the user's email has been verified."
+          },
+          "$PREFIX/e_delivery_service": {
+            "type": "string",
+            "format": "email",
+            "description": "Qualified electronic registered delivery (i.e., PEC)."
+          },
+          "$PREFIX/eid_exp_date": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+          },
+          "address": {
+            "type": "object",
+            "required": [
+              "street_address",
+              "postal_code",
+              "locality",
+              "region",
+              "country_code"
+            ],
+            "properties": {
+              "street_address": {
+                "type": "string",
+                "description": "The full address, including the address type, street name, and house number.",
+                "pattern": "^(Via|Viale|Piazza|Corso|Largo|Strada) .+ \\d+.*$",
+                "example": "Via Liszt 21"
+              },
+              "postal_code": {
+                "type": "string",
+                "description": "The ZIP code of the address.",
+                "pattern": "^\\d{5}$",
+                "example": "00144"
+              },
+              "locality": {
+                "type": "string",
+                "description": "The city or locality.",
+                "example": "Roma"
+              },
+              "region": {
+                "type": "string",
+                "description": "The province, represented by a two-letter code.",
+                "pattern": "^[A-Z]{2}$",
+                "example": "RM"
+              },
+              "country_code": {
+                "type": "string",
+                "description": "The country code, following ISO 3166-1 alpha-2 standard.",
+                "pattern": "^[A-Z]{2}$",
+                "example": "IT"
+              }
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  }
+}

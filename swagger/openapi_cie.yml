@@ -1,6 +1,6 @@
 openapi: 3.0.3
 info:
-  title: OAuth2 Authorization API
+  title: OAuth2 Authorization API - cie
   version: 1.0.1
 
 paths:
@@ -445,7 +445,7 @@ components:
               x-comparison-parameter: $./.well-known/openid-federation.metadata.trust_marks.trust_mark.sub==$./authentication.client_id
             id:
               type: string
-              pattern: "^https:\/\/[a-zA-Z0-9.-]+\/(openid_relying_party|openid_provider|federation_entity|oauth_authorization_server|oauth_resource)\/[a-zA-Z0-9._-]+\/$"
+              pattern: '^https:\/\/[a-zA-Z0-9.-]+\/(openid_relying_party|openid_provider|federation_entity|oauth_authorization_server|oauth_resource)\/[a-zA-Z0-9._-]+\/$'
             iat:
               type: integer
               format: int64
