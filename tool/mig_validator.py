@@ -411,8 +411,13 @@ class ECValidator(Validator):
         authority_hints = decoded_body.get('authority_hints', {})
         Validator.param_manager.update_value("authority_hints", authority_hints, Validator.param_manager.saved_param)
         # iss of trustmark
-        tm_iss = decoded_body.get('trust_marks')[0].get('iss')
+        trust_marks = decoded_body.get('trust_marks')
+        if not trust_marks:
+            Validator.test_manager.append_test(Validator.param_manager.increment_value("EC Payload", Validator.param_manager.section), "Valid Trust Chain from authority_hints", False, "The trust chain cannot be validated: $.trust_marks is missing from the Entity Configuration.")
+            return
+        tm_iss = trust_marks[0].get('iss')
         result = self.validation_authority_hints(authority_hints, iss, tm_iss)
+        
         if isinstance(result, bool):
             Validator.test_manager.append_test(Validator.param_manager.increment_value("EC Payload", Validator.param_manager.section), "Valid Trust Chain", result, "The trust chain from authority_hints has been validated.")
         else:
